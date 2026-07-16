@@ -1,0 +1,14 @@
+{
+  "name": "management-coach-agent-prototype",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.60.0"
+  },
+  "dependencies": {
+    "markdown-it": "14.3.0"
+  }
+}
