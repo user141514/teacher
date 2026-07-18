@@ -55,6 +55,10 @@ async function withFrontendServer(callback) {
   }
 }
 
+function createDeeplyNestedJson(depth) {
+  return `${'{"n":'.repeat(depth)}{}${'}'.repeat(depth)}`;
+}
+
 test('GET /api/health 返回不可缓存的健康状态', async () => {
   await withServer(async (origin) => {
     const response = await fetch(`${origin}/api/health`);
@@ -101,6 +105,71 @@ test('未注入辅导服务时四个辅导接口均返回服务不可用错误',
       });
     }
   });
+});
+
+test('四个辅导接口均在调用服务前拦截高风险人事请求', async () => {
+  const calls = [];
+  const coachService = Object.fromEntries([
+    'intake',
+    'classify',
+    'plan',
+    'feedback',
+  ].map((method) => [method, async () => {
+    calls.push(method);
+    return { source: method };
+  }]));
+
+  await withServer(async (origin) => {
+    for (const method of ['intake', 'classify', 'plan', 'feedback']) {
+      const response = await fetch(`${origin}/api/coach/${method}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ context: { notes: ['员工长期不胜任，拟解除其劳动合同'] } }),
+      });
+
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get('cache-control'), 'no-store');
+      assert.deepEqual(await response.json(), {
+        ok: true,
+        blocked: true,
+        code: 'HR_REVIEW_REQUIRED',
+        message: '该事项涉及高风险人事决策，请转交 HR 按公司制度处理。本工具仅可协助准备一般辅导沟通。',
+      });
+    }
+  }, { coachService });
+
+  assert.deepEqual(calls, []);
+});
+
+test('5000 层非风险 JSON 请求不会中断路由并会调用辅导服务', async () => {
+  const body = createDeeplyNestedJson(5000);
+  const calls = [];
+
+  assert.ok(Buffer.byteLength(body, 'utf8') < 32 * 1024);
+
+  await withServer(async (origin) => {
+    const response = await fetch(`${origin}/api/coach/intake`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    assert.equal(response.status, 200);
+    assert.deepEqual(await response.json(), {
+      ok: true,
+      blocked: false,
+      data: { source: 'deep' },
+    });
+  }, {
+    coachService: {
+      async intake(requestBody) {
+        calls.push(requestBody);
+        return { source: 'deep' };
+      },
+    },
+  });
+
+  assert.equal(calls.length, 1);
 });
 
 test('注入的辅导服务按路由调用对应方法并封装成功结果', async () => {

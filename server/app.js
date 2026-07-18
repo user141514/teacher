@@ -1,4 +1,5 @@
 const express = require('express');
+const { findHighRiskIntent } = require('./guardrails.js');
 
 const ERROR_MESSAGES = {
   INVALID_REQUEST: '请求无效，请检查后重试。',
@@ -31,6 +32,12 @@ function createApp({ coachService } = {}) {
 
   for (const method of ['intake', 'classify', 'plan', 'feedback']) {
     app.post(`/api/coach/${method}`, async (request, response) => {
+      const highRiskIntent = findHighRiskIntent(request.body);
+      if (highRiskIntent) {
+        response.json({ ok: true, blocked: true, ...highRiskIntent });
+        return;
+      }
+
       if (!coachService || typeof coachService[method] !== 'function') {
         sendError(response, 503, 'SERVICE_UNAVAILABLE');
         return;
