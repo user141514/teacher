@@ -1,0 +1,408 @@
+const assert = require('node:assert/strict');
+const test = require('node:test');
+
+const {
+  validateIntake,
+  validateClassification,
+  validatePlan,
+  validatePlanStop,
+  validateFeedback,
+} = require('../server/contracts.js');
+
+test('接受字段完整且已判定的分类结果', () => {
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '高',
+    quadrant: 'A',
+    type_id: 'A',
+    status: '已判定',
+    confidence: '高',
+    evidence: ['近两个绩效周期均达标'],
+    questions: [],
+  }), true);
+});
+
+test('已判定分类必须遵循能力与意愿的机械映射', () => {
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '低',
+    quadrant: 'B',
+    type_id: 'B',
+    status: '已判定',
+    confidence: '高',
+    evidence: ['具备独立交付能力但主动性不足'],
+    questions: [],
+  }), true);
+  assert.equal(validateClassification({
+    ability: '低',
+    will: '高',
+    quadrant: 'C',
+    type_id: 'C',
+    status: '已判定',
+    confidence: '高',
+    evidence: ['经验不足但主动承担挑战'],
+    questions: [],
+  }), true);
+  assert.equal(validateClassification({
+    ability: '低',
+    will: '低',
+    quadrant: 'D',
+    type_id: 'D1',
+    status: '已判定',
+    confidence: '高',
+    evidence: ['入职时间较短且需要明确指引'],
+    questions: [],
+  }), true);
+  assert.equal(validateClassification({
+    ability: '低',
+    will: '低',
+    quadrant: 'D',
+    type_id: 'D2',
+    status: '已判定',
+    confidence: '高',
+    evidence: ['持续未达标且已多次辅导'],
+    questions: [],
+  }), true);
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '高',
+    quadrant: 'D',
+    type_id: 'D2',
+    status: '已判定',
+    confidence: '高',
+    evidence: ['能力与意愿均高'],
+    questions: [],
+  }), false);
+});
+
+test('拒绝能力或意愿为中间状态的分类结果', () => {
+  assert.equal(validateClassification({
+    ability: '中',
+    will: '高',
+    quadrant: 'A',
+    type_id: 'A',
+    status: '已判定',
+    confidence: '中',
+    evidence: ['能力证据处于中间状态'],
+    questions: [],
+  }), false);
+
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '中',
+    quadrant: 'B',
+    type_id: 'B',
+    status: '已判定',
+    confidence: '中',
+    evidence: ['意愿证据处于中间状态'],
+    questions: [],
+  }), false);
+
+});
+
+test('D 类资料未齐时可安全待补充，其他已知组合不得绕过映射', () => {
+  assert.equal(validateClassification({
+    ability: '低',
+    will: '低',
+    quadrant: null,
+    type_id: null,
+    status: '待补充',
+    confidence: '低',
+    evidence: ['尚未补齐入职与辅导历史'],
+    questions: ['补充入职时长、绩效周期和辅导历史'],
+  }), true);
+
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '低',
+    quadrant: null,
+    type_id: null,
+    status: '待补充',
+    confidence: '低',
+    evidence: ['主动性不足'],
+    questions: ['补充材料'],
+  }), false);
+});
+
+test('能力或意愿未知时仅接受待补充且无分类类型', () => {
+  assert.equal(validateClassification({
+    ability: '未知',
+    will: '低',
+    quadrant: null,
+    type_id: null,
+    status: '待补充',
+    confidence: '低',
+    evidence: [],
+    questions: ['补充最近绩效周期'],
+  }), true);
+
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '未知',
+    quadrant: 'B',
+    type_id: 'B',
+    status: '已判定',
+    confidence: '高',
+    evidence: [],
+    questions: [],
+  }), false);
+
+  assert.equal(validateClassification({
+    ability: '未知',
+    will: '低',
+    quadrant: null,
+    type_id: null,
+    status: '待补充',
+    confidence: '高',
+    evidence: [],
+    questions: ['补充能力证据'],
+  }), false);
+});
+
+test('已判定分类必须提供证据', () => {
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '高',
+    quadrant: 'A',
+    type_id: 'A',
+    status: '已判定',
+    confidence: '高',
+    evidence: [],
+    questions: [],
+  }), false);
+});
+
+test('证据冲突时只接受待人工确认且不输出类型', () => {
+  assert.equal(validateClassification({
+    ability: '低',
+    will: '低',
+    quadrant: 'D',
+    type_id: null,
+    status: '待人工确认',
+    confidence: '低',
+    evidence: ['证据冲突'],
+    questions: ['补充辅导历史'],
+  }), true);
+
+  assert.equal(validateClassification({
+    ability: '低',
+    will: '低',
+    quadrant: 'D',
+    type_id: 'D2',
+    status: '待人工确认',
+    confidence: '低',
+    evidence: ['证据冲突'],
+    questions: ['补充辅导历史'],
+  }), false);
+
+  assert.equal(validateClassification({
+    ability: '低',
+    will: '低',
+    quadrant: 'A',
+    type_id: null,
+    status: '待人工确认',
+    confidence: '低',
+    evidence: ['证据冲突'],
+    questions: ['补充辅导历史'],
+  }), false);
+});
+
+test('拒绝非法枚举和额外的分类字段', () => {
+  assert.equal(validateClassification({
+    ability: '优秀',
+    will: '高',
+    quadrant: 'A',
+    type_id: 'A',
+    status: '已判定',
+    confidence: '高',
+    evidence: [],
+    questions: [],
+  }), false);
+
+  assert.equal(validateClassification({
+    ability: '高',
+    will: '高',
+    quadrant: 'A',
+    type_id: 'A',
+    status: '已判定',
+    confidence: '高',
+    evidence: [],
+    questions: [],
+    internal_note: '不应通过',
+  }), false);
+});
+
+test('接收响应接受提示词步骤 1 的正常 JSON，并拒绝结构、额外字段和数组越界', () => {
+  const intake = {
+    sufficient: false,
+    status: '待补充',
+    high_risk_personnel_action: false,
+    missing: ['绩效周期', '辅导历史'],
+    questions: ['请补充最近绩效周期结果和既往辅导历史'],
+    normalized_profile: {
+      ability_clues: '能力不足',
+      will_clues: '意愿不足',
+      tenure: '6个月',
+      perf_history: '',
+      performance_cycles: '',
+      coaching_history: '',
+      goal: '',
+      pain: '',
+    },
+  };
+
+  assert.equal(validateIntake(intake), true);
+  assert.equal(validateIntake({ ...intake, extra: true }), false);
+  assert.equal(validateIntake({ ...intake, normalized_profile: {} }), false);
+  assert.equal(validateIntake({
+    ...intake,
+    questions: Array.from({ length: 8 }, () => '补充信息'),
+  }), true);
+  assert.equal(validateIntake({
+    ...intake,
+    questions: Array.from({ length: 9 }, () => '补充信息'),
+  }), false);
+});
+
+test('接收响应强制高风险、充分性与缺失项状态一致', () => {
+  const evaluable = {
+    sufficient: true,
+    status: '可评估',
+    high_risk_personnel_action: false,
+    missing: [],
+    questions: [],
+    normalized_profile: {
+      ability_clues: '可独立交付',
+      will_clues: '主动承担挑战',
+      tenure: '18个月',
+      perf_history: '连续达标',
+      performance_cycles: '已完成两个周期',
+      coaching_history: '无专项辅导',
+      goal: '承担更高难度任务',
+      pain: '',
+    },
+  };
+
+  assert.equal(validateIntake(evaluable), true);
+  assert.equal(validateIntake({ ...evaluable, high_risk_personnel_action: true }), false);
+  assert.equal(validateIntake({ ...evaluable, sufficient: false }), false);
+  assert.equal(validateIntake({
+    ...evaluable,
+    sufficient: false,
+    status: '高风险停止',
+    high_risk_personnel_action: false,
+  }), false);
+  assert.equal(validateIntake({
+    ...evaluable,
+    sufficient: false,
+    status: '高风险停止',
+    high_risk_personnel_action: true,
+  }), true);
+  assert.equal(validateIntake({
+    ...evaluable,
+    sufficient: false,
+    status: '待补充',
+    missing: ['绩效周期', '绩效周期'],
+  }), false);
+});
+
+test('接收响应按状态约束缺失项与追问', () => {
+  const evaluable = {
+    sufficient: true,
+    status: '可评估',
+    high_risk_personnel_action: false,
+    missing: [],
+    questions: [],
+    normalized_profile: {
+      ability_clues: '可独立交付',
+      will_clues: '主动承担挑战',
+      tenure: '18个月',
+      perf_history: '连续达标',
+      performance_cycles: '已完成两个周期',
+      coaching_history: '无专项辅导',
+      goal: '承担更高难度任务',
+      pain: '',
+    },
+  };
+
+  assert.equal(validateIntake({
+    ...evaluable,
+    missing: ['绩效周期'],
+  }), false);
+  assert.equal(validateIntake({
+    ...evaluable,
+    questions: ['请补充绩效周期'],
+  }), false);
+  assert.equal(validateIntake({
+    ...evaluable,
+    sufficient: false,
+    status: '待补充',
+    missing: [],
+    questions: ['请补充绩效周期'],
+  }), false);
+  assert.equal(validateIntake({
+    ...evaluable,
+    sufficient: false,
+    status: '待补充',
+    missing: ['绩效周期'],
+    questions: [],
+  }), false);
+  assert.equal(validateIntake({
+    ...evaluable,
+    sufficient: false,
+    status: '待人工确认',
+    missing: [],
+    questions: [],
+  }), false);
+  assert.equal(validateIntake({
+    ...evaluable,
+    sufficient: false,
+    status: '高风险停止',
+    high_risk_personnel_action: true,
+    missing: [],
+    questions: [],
+  }), true);
+});
+
+test('方案响应接受提示词步骤 3 的正常 JSON，并将停止结果隔离校验', () => {
+  const plan = {
+    entry: ['先确认员工对目标和困难的理解'],
+    cautions: ['避免将问题归因于个人态度'],
+    frequency: '每周一次，连续四周复盘',
+    gap_fix: ['将关键任务拆为可观察的小目标'],
+    scripts: ['我们先一起明确本周最重要的目标。', '你愿意在周五前完成哪一步行动？'],
+  };
+  const stoppedPlan = {
+    status: '停止生成',
+    type_id: null,
+    steps: [],
+    stop_reason: '高风险人事处置需转人工处理',
+  };
+
+  assert.equal(validatePlan(plan), true);
+  assert.equal(validatePlan({ ...plan, status: '已生成' }), false);
+  assert.equal(validatePlan({ ...plan, scripts: [...plan.scripts, '多余话术'] }), false);
+  assert.equal(validatePlanStop(stoppedPlan), true);
+  assert.equal(validatePlan(stoppedPlan), false);
+  assert.equal(validatePlanStop({ ...stoppedPlan, steps: ['不得生成步骤'] }), false);
+});
+
+test('反馈响应接受提示词步骤 4 的正常 JSON，并拒绝额外字段和边界外数组', () => {
+  const feedback = {
+    progress_read: '意愿提升，但独立交付信心仍不足。',
+    next_steps: ['将目标拆分为本周可完成的小步骤', '周五复盘执行结果'],
+    watch_points: ['观察遇到困难时是否主动求助'],
+  };
+
+  assert.equal(validateFeedback(feedback), true);
+  assert.equal(validateFeedback({ ...feedback, rating: 5 }), false);
+  assert.equal(validateFeedback({ ...feedback, progress_read: '' }), false);
+  assert.equal(validateFeedback({
+    ...feedback,
+    next_steps: [...feedback.next_steps, '补充第三步'],
+  }), true);
+  assert.equal(validateFeedback({
+    ...feedback,
+    next_steps: [...feedback.next_steps, '补充第三步', '超出边界'],
+  }), false);
+});
