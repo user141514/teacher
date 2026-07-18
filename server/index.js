@@ -3,6 +3,9 @@ const path = require('node:path');
 const express = require('express');
 
 const { createApp } = require('./app.js');
+const { createCoachService } = require('./coach-service.js');
+const { createDeepSeekClient } = require('./deepseek-client.js');
+const { createPromptLoader } = require('./prompt-loader.js');
 
 function invalidPortError() {
   const error = new Error('INVALID_PORT');
@@ -28,8 +31,21 @@ function resolveListenPort(value) {
   return value === 0 ? 0 : resolvePort(value);
 }
 
-function createServer(options) {
-  const app = createApp(options);
+function createDefaultCoachService({ fetchImpl } = {}) {
+  const rootDir = path.join(__dirname, '..');
+  const promptLoader = createPromptLoader({ rootDir });
+  const client = createDeepSeekClient({
+    fetchImpl,
+    apiKey: process.env.DEEPSEEK_API_KEY,
+  });
+
+  return createCoachService({ promptLoader, client });
+}
+
+function createServer({ coachService, fetchImpl } = {}) {
+  const app = createApp({
+    coachService: coachService || createDefaultCoachService({ fetchImpl }),
+  });
   const frontendDir = path.join(__dirname, '..', 'frontend');
 
   app.use(express.static(frontendDir, {
@@ -46,9 +62,9 @@ function createServer(options) {
   return http.createServer(app);
 }
 
-function startServer({ port = 4173, coachService } = {}) {
+function startServer({ port = 4173, coachService, fetchImpl } = {}) {
   const listenPort = resolveListenPort(port);
-  const server = createServer({ coachService });
+  const server = createServer({ coachService, fetchImpl });
 
   return server.listen(listenPort, '127.0.0.1');
 }
@@ -70,4 +86,9 @@ if (require.main === module) {
   startFromEnvironment();
 }
 
-module.exports = { createServer, resolvePort, startServer };
+module.exports = {
+  createDefaultCoachService,
+  createServer,
+  resolvePort,
+  startServer,
+};

@@ -2,6 +2,9 @@
   "name": "management-coach-agent-prototype",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "node --env-file=.env server/index.js",
     "start": "node server/index.js",
