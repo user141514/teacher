@@ -212,5 +212,6 @@ function render() {
 }
 
 document.getElementById('home-brand').addEventListener('click', returnHome);
+document.getElementById('top-return-home').addEventListener('click', returnHome);
 window.addEventListener('beforeunload', cancelPendingRequests);
 render();

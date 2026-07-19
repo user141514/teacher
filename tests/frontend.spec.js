@@ -98,6 +98,67 @@ test('刷新后回到空白首页，不保留上次输入或会话数据', async
     .toEqual({ local: 0, session: 0 });
 });
 
+test('顶部返回首页会从方案页清空当前会话', async ({ page }) => {
+  await advanceToPlan(page);
+
+  const returnHome = page.locator('#top-return-home');
+  await expect(returnHome).toBeVisible();
+  await expect(returnHome).toHaveText('返回首页');
+  await returnHome.click();
+
+  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('');
+  await expect(page.getByLabel('近期辅导困扰')).toHaveValue('');
+  await expect(page.getByLabel('员工特征补充')).toHaveValue('');
+  await expect(page.locator('#coach-plan')).toHaveCount(0);
+  await expect(page.locator('[id^="type-card-"]')).toHaveCount(0);
+  await expect(page.locator('#feedback-next-steps')).toHaveCount(0);
+});
+
+test('顶部返回首页后迟到请求不会恢复旧会话', async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init = {}) => {
+      const withoutSignal = { ...init };
+      delete withoutSignal.signal;
+      return nativeFetch(input, withoutSignal);
+    };
+  });
+  let releaseDelayedIntake;
+  const delayedIntake = new Promise((resolve) => { releaseDelayedIntake = resolve; });
+  const fixtures = defaultFixtures();
+  const intakeResponse = fixtures.intake[0];
+  fixtures.intake = [() => delayedIntake];
+  const requests = await mockCoachApi(page, fixtures);
+  await page.goto('/');
+  await fillHome(page);
+  await page.getByRole('button', { name: '审查信息' }).click();
+  await expect.poll(() => requests.filter((item) => item.method === 'intake').length).toBe(1);
+
+  await page.locator('#top-return-home').click();
+  releaseDelayedIntake(intakeResponse);
+  await page.waitForTimeout(150);
+
+  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('');
+  await expect(page.getByLabel('近期辅导困扰')).toHaveValue('');
+  await expect(page.getByLabel('员工特征补充')).toHaveValue('');
+  await expect(page.locator('.panel-h')).toHaveCount(0);
+});
+
+test('窄屏下顶部返回首页持续可见且不造成横向溢出', async ({ page }) => {
+  await page.setViewportSize({ width: 320, height: 700 });
+  await page.goto('/');
+
+  await expect(page.locator('#top-return-home')).toBeVisible();
+  await expect(page.locator('.badge-top')).toBeHidden();
+  const viewport = await page.evaluate(() => ({
+    clientWidth: document.documentElement.clientWidth,
+    scrollWidth: document.documentElement.scrollWidth,
+  }));
+  expect(viewport.scrollWidth).toBe(viewport.clientWidth);
+});
+
 for (const status of ['待补充', '待人工确认']) {
   test(`类型判定为${status}时不显示进入方案按钮`, async ({ page }) => {
     const pending = status === '待补充'
