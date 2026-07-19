@@ -3,233 +3,122 @@ const test = require('node:test');
 
 const {
   validateIntake,
+  validateModelClassification,
   validateClassification,
   validatePlan,
   validatePlanStop,
   validateFeedback,
 } = require('../server/contracts.js');
 
-test('接受字段完整且已判定的分类结果', () => {
-  assert.equal(validateClassification({
-    ability: '高',
-    will: '高',
-    quadrant: 'A',
-    type_id: 'A',
-    status: '已判定',
-    confidence: '高',
-    evidence: ['近两个绩效周期均达标'],
-    questions: [],
-  }), true);
-});
-
-test('已判定分类必须遵循能力与意愿的机械映射', () => {
-  assert.equal(validateClassification({
+function completeClassification(overrides = {}) {
+  return {
     ability: '高',
     will: '低',
     quadrant: 'B',
     type_id: 'B',
     status: '已判定',
-    confidence: '高',
-    evidence: ['具备独立交付能力但主动性不足'],
+    classification_confidence: '高',
+    strategy: '激发意愿',
+    coach_mode: '诱导式',
+    reason: '能独立交付，但近期主动性不足。',
+    evidence: ['能独立交付', '近期主动性不足'],
     questions: [],
-  }), true);
-  assert.equal(validateClassification({
-    ability: '低',
-    will: '高',
-    quadrant: 'C',
-    type_id: 'C',
-    status: '已判定',
-    confidence: '高',
-    evidence: ['经验不足但主动承担挑战'],
-    questions: [],
-  }), true);
-  assert.equal(validateClassification({
-    ability: '低',
-    will: '低',
-    quadrant: 'D',
-    type_id: 'D1',
-    status: '已判定',
-    confidence: '高',
-    evidence: ['入职时间较短且需要明确指引'],
-    questions: [],
-  }), true);
-  assert.equal(validateClassification({
-    ability: '低',
-    will: '低',
-    quadrant: 'D',
-    type_id: 'D2',
-    status: '已判定',
-    confidence: '高',
-    evidence: ['持续未达标且已多次辅导'],
-    questions: [],
-  }), true);
-  assert.equal(validateClassification({
-    ability: '高',
-    will: '高',
-    quadrant: 'D',
-    type_id: 'D2',
-    status: '已判定',
-    confidence: '高',
-    evidence: ['能力与意愿均高'],
-    questions: [],
-  }), false);
+    ...overrides,
+  };
+}
+
+function modelClassification(overrides = {}) {
+  const application = completeClassification();
+  const { classification_confidence, ...rest } = application;
+  return { ...rest, confidence: classification_confidence, ...overrides };
+}
+
+test('模型分类与应用分类分别使用 confidence 和 classification_confidence', () => {
+  assert.equal(validateModelClassification(modelClassification()), true);
+  assert.equal(validateClassification(completeClassification()), true);
+  assert.equal(validateModelClassification(completeClassification()), false);
+  assert.equal(validateClassification(modelClassification()), false);
 });
 
-test('拒绝能力或意愿为中间状态的分类结果', () => {
-  assert.equal(validateClassification({
-    ability: '中',
-    will: '高',
-    quadrant: 'A',
-    type_id: 'A',
-    status: '已判定',
-    confidence: '中',
-    evidence: ['能力证据处于中间状态'],
-    questions: [],
-  }), false);
-
-  assert.equal(validateClassification({
-    ability: '高',
-    will: '中',
-    quadrant: 'B',
-    type_id: 'B',
-    status: '已判定',
-    confidence: '中',
-    evidence: ['意愿证据处于中间状态'],
-    questions: [],
-  }), false);
-
+test('已判定应用分类严格校验策略映射、模式与具体依据', () => {
+  assert.equal(validateClassification(completeClassification()), true);
+  assert.equal(validateClassification(completeClassification({ strategy: '委以重任' })), false);
+  assert.equal(validateClassification(completeClassification({ coach_mode: '授权式' })), false);
+  assert.equal(validateClassification(completeClassification({ reason: '  ' })), false);
+  assert.equal(validateClassification(completeClassification({ matched_type: 'B' })), false);
+  assert.equal(validateClassification(completeClassification({ sub_type: 'B' })), false);
+  assert.equal(validateClassification(completeClassification({ alt_type: 'C' })), false);
 });
 
-test('D 类资料未齐时可安全待补充，其他已知组合不得绕过映射', () => {
-  assert.equal(validateClassification({
-    ability: '低',
-    will: '低',
-    quadrant: null,
-    type_id: null,
-    status: '待补充',
-    confidence: '低',
-    evidence: ['尚未补齐入职与辅导历史'],
-    questions: ['补充入职时长、绩效周期和辅导历史'],
-  }), true);
-
-  assert.equal(validateClassification({
-    ability: '高',
-    will: '低',
-    quadrant: null,
-    type_id: null,
-    status: '待补充',
-    confidence: '低',
-    evidence: ['主动性不足'],
-    questions: ['补充材料'],
-  }), false);
-});
-
-test('能力或意愿未知时仅接受待补充且无分类类型', () => {
-  assert.equal(validateClassification({
+test('待补充与待人工确认不得生成类型化策略', () => {
+  const pending = completeClassification({
     ability: '未知',
     will: '低',
     quadrant: null,
     type_id: null,
     status: '待补充',
-    confidence: '低',
+    classification_confidence: '低',
+    strategy: null,
+    coach_mode: null,
+    reason: '缺少可用的能力证据。',
     evidence: [],
-    questions: ['补充最近绩效周期'],
-  }), true);
-
+    questions: ['请补充近期绩效证据。'],
+  });
+  assert.equal(validateClassification(pending), true);
+  assert.equal(validateClassification({ ...pending, strategy: '激发意愿' }), false);
   assert.equal(validateClassification({
+    ...pending,
     ability: '高',
-    will: '未知',
     quadrant: 'B',
-    type_id: 'B',
-    status: '已判定',
-    confidence: '高',
-    evidence: [],
-    questions: [],
-  }), false);
-
-  assert.equal(validateClassification({
-    ability: '未知',
-    will: '低',
-    quadrant: null,
-    type_id: null,
-    status: '待补充',
-    confidence: '高',
-    evidence: [],
-    questions: ['补充能力证据'],
-  }), false);
-});
-
-test('已判定分类必须提供证据', () => {
-  assert.equal(validateClassification({
-    ability: '高',
-    will: '高',
-    quadrant: 'A',
-    type_id: 'A',
-    status: '已判定',
-    confidence: '高',
-    evidence: [],
-    questions: [],
-  }), false);
-});
-
-test('证据冲突时只接受待人工确认且不输出类型', () => {
-  assert.equal(validateClassification({
-    ability: '低',
-    will: '低',
-    quadrant: 'D',
-    type_id: null,
     status: '待人工确认',
-    confidence: '低',
-    evidence: ['证据冲突'],
-    questions: ['补充辅导历史'],
+    reason: '能力与意愿证据存在冲突。',
   }), true);
-
-  assert.equal(validateClassification({
-    ability: '低',
-    will: '低',
-    quadrant: 'D',
-    type_id: 'D2',
-    status: '待人工确认',
-    confidence: '低',
-    evidence: ['证据冲突'],
-    questions: ['补充辅导历史'],
-  }), false);
-
-  assert.equal(validateClassification({
-    ability: '低',
-    will: '低',
-    quadrant: 'A',
-    type_id: null,
-    status: '待人工确认',
-    confidence: '低',
-    evidence: ['证据冲突'],
-    questions: ['补充辅导历史'],
-  }), false);
 });
 
-test('拒绝非法枚举和额外的分类字段', () => {
-  assert.equal(validateClassification({
-    ability: '优秀',
-    will: '高',
-    quadrant: 'A',
-    type_id: 'A',
-    status: '已判定',
-    confidence: '高',
-    evidence: [],
-    questions: [],
-  }), false);
+test('D 类资料未齐可待补充，其他已知组合不得绕过映射', () => {
+  const pendingD = completeClassification({
+    ability: '低', will: '低', quadrant: null, type_id: null, status: '待补充',
+    classification_confidence: '低', strategy: null, coach_mode: null,
+    reason: '尚未补齐入职与辅导历史。',
+    questions: ['补充入职时长、绩效周期和辅导历史。'],
+  });
+  assert.equal(validateClassification(pendingD), true);
+  assert.equal(validateClassification({ ...pendingD, ability: '高' }), false);
+});
 
-  assert.equal(validateClassification({
-    ability: '高',
-    will: '高',
-    quadrant: 'A',
-    type_id: 'A',
-    status: '已判定',
-    confidence: '高',
-    evidence: [],
-    questions: [],
-    internal_note: '不应通过',
-  }), false);
+test('证据冲突时仅接受待人工确认且不输出类型', () => {
+  const manual = completeClassification({
+    ability: '低', will: '低', quadrant: 'D', type_id: null, status: '待人工确认',
+    classification_confidence: '低', strategy: null, coach_mode: null,
+    reason: '绩效证据与辅导反馈存在冲突。', questions: ['请主管人工确认。'],
+  });
+  assert.equal(validateClassification(manual), true);
+  assert.equal(validateClassification({ ...manual, type_id: 'D2' }), false);
+  assert.equal(validateClassification({ ...manual, quadrant: 'A' }), false);
+});
+
+test('五类已判定结果必须遵循能力意愿和教练映射', () => {
+  const cases = [
+    ['A', '高', '高', 'A', '委以重任', '授权式'],
+    ['B', '高', '低', 'B', '激发意愿', '诱导式'],
+    ['C', '低', '高', 'C', '长期培养', '引导式'],
+    ['D1', '低', '低', 'D', '手把手带', '教导式'],
+    ['D2', '低', '低', 'D', '绩效改进/优化', '绩效面谈'],
+  ];
+
+  for (const [typeId, ability, will, quadrant, strategy, coachMode] of cases) {
+    assert.equal(validateClassification(completeClassification({
+      ability, will, quadrant, type_id: typeId, strategy, coach_mode: coachMode,
+    })), true);
+  }
+
+  assert.equal(validateClassification(completeClassification({ quadrant: 'D', type_id: 'D2' })), false);
+});
+
+test('分类结果拒绝非法枚举、缺少证据和额外字段', () => {
+  assert.equal(validateClassification(completeClassification({ ability: '中' })), false);
+  assert.equal(validateClassification(completeClassification({ evidence: [] })), false);
+  assert.equal(validateClassification(completeClassification({ internal_note: '不应通过' })), false);
 });
 
 test('接收响应接受提示词步骤 1 的正常 JSON，并拒绝结构、额外字段和数组越界', () => {

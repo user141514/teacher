@@ -68,7 +68,8 @@ const intakeResponse = {
   },
 };
 
-const classificationResponse = {
+function classificationSchema(confidenceField) {
+  return {
   type: 'object',
   additionalProperties: false,
   required: [
@@ -77,7 +78,10 @@ const classificationResponse = {
     'quadrant',
     'type_id',
     'status',
-    'confidence',
+    confidenceField,
+    'strategy',
+    'coach_mode',
+    'reason',
     'evidence',
     'questions',
   ],
@@ -87,7 +91,10 @@ const classificationResponse = {
     quadrant: { anyOf: [{ enum: ['A', 'B', 'C', 'D'] }, { type: 'null' }] },
     type_id: { anyOf: [typeId, { type: 'null' }] },
     status: { enum: ['待补充', '待人工确认', '已判定'] },
-    confidence: { enum: ['高', '中', '低'] },
+    [confidenceField]: { enum: ['高', '中', '低'] },
+    strategy: { anyOf: [shortText, { type: 'null' }] },
+    coach_mode: { anyOf: [shortText, { type: 'null' }] },
+    reason: { type: 'string', minLength: 1, maxLength: 500 },
     evidence: {
       type: 'array',
       maxItems: 12,
@@ -99,7 +106,11 @@ const classificationResponse = {
       items: shortText,
     },
   },
-};
+  };
+}
+
+const modelClassificationResponse = classificationSchema('confidence');
+const classificationResponse = classificationSchema('classification_confidence');
 
 const planResponse = {
   type: 'object',
@@ -171,6 +182,7 @@ const feedbackResponse = {
 };
 
 const validateIntakeSchema = ajv.compile(intakeResponse);
+const validateModelClassificationSchema = ajv.compile(modelClassificationResponse);
 const validateClassificationSchema = ajv.compile(classificationResponse);
 const validatePlan = ajv.compile(planResponse);
 const validatePlanStop = ajv.compile(planStopResponse);
@@ -181,6 +193,14 @@ const classificationMappings = {
   '高|低': { quadrant: 'B', typeIds: ['B'] },
   '低|高': { quadrant: 'C', typeIds: ['C'] },
   '低|低': { quadrant: 'D', typeIds: ['D1', 'D2'] },
+};
+
+const coachingMappings = {
+  A: { strategy: '委以重任', coachMode: '授权式' },
+  B: { strategy: '激发意愿', coachMode: '诱导式' },
+  C: { strategy: '长期培养', coachMode: '引导式' },
+  D1: { strategy: '手把手带', coachMode: '教导式' },
+  D2: { strategy: '绩效改进/优化', coachMode: '绩效面谈' },
 };
 
 function validateIntake(payload) {
@@ -212,16 +232,20 @@ function validateIntake(payload) {
   return payload.questions.length > 0;
 }
 
-function validateClassification(payload) {
-  if (!validateClassificationSchema(payload)) {
+function validateClassificationSemantics(payload, confidenceField) {
+  if (payload.reason.trim().length === 0) {
     return false;
   }
+
+  const confidence = payload[confidenceField];
 
   if (payload.ability === '未知' || payload.will === '未知') {
     return payload.status === '待补充'
       && payload.quadrant === null
       && payload.type_id === null
-      && payload.confidence === '低';
+      && confidence === '低'
+      && payload.strategy === null
+      && payload.coach_mode === null;
   }
 
   const mapping = classificationMappings[`${payload.ability}|${payload.will}`];
@@ -230,27 +254,48 @@ function validateClassification(payload) {
     return mapping.quadrant === 'D'
       && payload.quadrant === null
       && payload.type_id === null
-      && payload.confidence === '低';
+      && confidence === '低'
+      && payload.strategy === null
+      && payload.coach_mode === null;
   }
 
   if (payload.status === '待人工确认') {
     return payload.type_id === null
-      && (payload.quadrant === null || payload.quadrant === mapping.quadrant);
+      && (payload.quadrant === null || payload.quadrant === mapping.quadrant)
+      && payload.strategy === null
+      && payload.coach_mode === null;
   }
+
+  const coaching = coachingMappings[payload.type_id];
 
   return payload.status === '已判定'
     && payload.quadrant === mapping.quadrant
     && mapping.typeIds.includes(payload.type_id)
+    && coaching
+    && payload.strategy === coaching.strategy
+    && payload.coach_mode === coaching.coachMode
     && payload.evidence.length > 0;
+}
+
+function validateModelClassification(payload) {
+  return validateModelClassificationSchema(payload)
+    && validateClassificationSemantics(payload, 'confidence');
+}
+
+function validateClassification(payload) {
+  return validateClassificationSchema(payload)
+    && validateClassificationSemantics(payload, 'classification_confidence');
 }
 
 module.exports = {
   intakeResponse,
+  modelClassificationResponse,
   classificationResponse,
   planResponse,
   planStopResponse,
   feedbackResponse,
   validateIntake,
+  validateModelClassification,
   validateClassification,
   validatePlan,
   validatePlanStop,
