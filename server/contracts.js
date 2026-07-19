@@ -245,7 +245,8 @@ function validateClassificationSemantics(payload, confidenceField) {
       && payload.type_id === null
       && confidence === '低'
       && payload.strategy === null
-      && payload.coach_mode === null;
+      && payload.coach_mode === null
+      && payload.questions.length > 0;
   }
 
   const mapping = classificationMappings[`${payload.ability}|${payload.will}`];
@@ -256,14 +257,17 @@ function validateClassificationSemantics(payload, confidenceField) {
       && payload.type_id === null
       && confidence === '低'
       && payload.strategy === null
-      && payload.coach_mode === null;
+      && payload.coach_mode === null
+      && payload.questions.length > 0;
   }
 
   if (payload.status === '待人工确认') {
     return payload.type_id === null
       && (payload.quadrant === null || payload.quadrant === mapping.quadrant)
+      && confidence === '低'
       && payload.strategy === null
-      && payload.coach_mode === null;
+      && payload.coach_mode === null
+      && payload.questions.length > 0;
   }
 
   const coaching = coachingMappings[payload.type_id];

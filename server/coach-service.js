@@ -191,12 +191,12 @@ function createCoachService({ promptLoader, client } = {}) {
       return INVALID_REQUEST;
     }
 
-    if (request.classification.status !== '已判定') {
-      return CLASSIFICATION_NOT_READY;
-    }
-
     if (!validateClassification(request.classification)) {
       return INVALID_REQUEST;
+    }
+
+    if (request.classification.status !== '已判定') {
+      return CLASSIFICATION_NOT_READY;
     }
 
     const result = await completeStep(3, {
@@ -226,12 +226,12 @@ function createCoachService({ promptLoader, client } = {}) {
       return INVALID_REQUEST;
     }
 
-    if (request.classification.status !== '已判定') {
-      return CLASSIFICATION_NOT_READY;
-    }
-
     if (!validateClassification(request.classification)) {
       return INVALID_REQUEST;
+    }
+
+    if (request.classification.status !== '已判定') {
+      return CLASSIFICATION_NOT_READY;
     }
 
     const result = await completeStep(4, {

@@ -68,13 +68,13 @@
 第三步·查表:仅当 ability、will 均非“未知”且无证据冲突时，按知识库第四节速查表映射 quadrant 与 type_id。禁止输出表外类型。
 第四步·左下格区分:若 ability=低 且 will=低,必须按知识库第三节规则,用"入职时长 + 绩效历史 + 是否已辅导"区分 D1(新入职适应型)或 D2(绩效改进支持型)；入职满 3 至 12 个月时，绩效周期或辅导历史缺失即 status="待补充"，quadrant/type_id 均为 null，不得输出 D1/D2。
 
-【字段语义】confidence 是模型原始分类可信度，只表示本步骤类型判定的可靠程度；不得与步骤 1 画像中的 employee_confidence（员工自身信心）混淆。
+【字段语义】confidence 是模型原始分类可信度，只表示本步骤类型判定的可靠程度；它不等于员工本人完成任务的信心。员工本人信心只在步骤 4 的 progress_read 中描述。
 
 【策略映射】仅 status="已判定" 时，strategy 与 coach_mode 必须严格按 type_id 输出：A="委以重任"/"授权式"；B="激发意愿"/"诱导式"；C="长期培养"/"引导式"；D1="手把手带"/"教导式"；D2="绩效改进/优化"/"绩效面谈"。reason 必须引用输入中的具体事实，说明该判定的依据，不得为空或使用泛化占位描述。
 
-【等待态】任一维证据不足以判定,confidence 记"低"并在 reason 说明需补充什么；ability 或 will 为“未知”时，status="待补充"且 quadrant/type_id 均为 null。status="待补充"或"待人工确认"时，strategy 与 coach_mode 必须为 null，不得生成任何类型化策略，也不得继续生成方案。仅 status="已判定" 时才可输出 type_id、strategy 与 coach_mode。
+【等待态】任一维证据不足以判定,confidence 记"低"并在 reason 说明需补充什么；ability 或 will 为“未知”时，status="待补充"且 quadrant/type_id 均为 null。status="待补充"或"待人工确认"时，confidence 必须为"低"、questions 必须包含至少一个待补充或澄清问题、strategy 与 coach_mode 必须为 null，不得生成任何类型化策略，也不得继续生成方案。仅 status="已判定" 时才可输出 type_id、strategy 与 coach_mode。
 
-【输入】normalized_profile:{{profile_json}}
+【输入】normalized_profile:{{normalized_profile}}
 
 【输出】仅输出 JSON:
 {"ability":"高|低|未知","will":"高|低|未知",

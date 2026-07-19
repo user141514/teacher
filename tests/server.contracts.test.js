@@ -75,6 +75,36 @@ test('待补充与待人工确认不得生成类型化策略', () => {
   }), true);
 });
 
+test('模型与应用等待态均必须是低可信度且包含待确认问题', () => {
+  const pendingApp = completeClassification({
+    ability: '未知', quadrant: null, type_id: null, status: '待补充',
+    classification_confidence: '低', strategy: null, coach_mode: null,
+    reason: '缺少能力证据。', evidence: [], questions: ['请补充能力证据。'],
+  });
+  const { classification_confidence, ...pendingFields } = pendingApp;
+  const pendingModel = { ...pendingFields, confidence: classification_confidence };
+  const manualApp = {
+    ...pendingApp,
+    ability: '高',
+    quadrant: 'B',
+    status: '待人工确认',
+    reason: '能力和意愿证据存在冲突。',
+  };
+  const { classification_confidence: manualConfidence, ...manualFields } = manualApp;
+  const manualModel = { ...manualFields, confidence: manualConfidence };
+
+  for (const [validate, payload, confidenceField] of [
+    [validateClassification, pendingApp, 'classification_confidence'],
+    [validateModelClassification, pendingModel, 'confidence'],
+    [validateClassification, manualApp, 'classification_confidence'],
+    [validateModelClassification, manualModel, 'confidence'],
+  ]) {
+    assert.equal(validate(payload), true);
+    assert.equal(validate({ ...payload, [confidenceField]: '高' }), false);
+    assert.equal(validate({ ...payload, questions: [] }), false);
+  }
+});
+
 test('D 类资料未齐可待补充，其他已知组合不得绕过映射', () => {
   const pendingD = completeClassification({
     ability: '低', will: '低', quadrant: null, type_id: null, status: '待补充',
