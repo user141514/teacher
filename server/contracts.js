@@ -1,10 +1,36 @@
 const Ajv = require('ajv');
+const { hasCompleteGrowScripts, hasCompleteSbi } = require('./coaching-methods.js');
 
 const ajv = new Ajv({ allErrors: true });
 
 const shortText = { type: 'string', minLength: 1, maxLength: 160 };
 const profileText = { type: 'string', maxLength: 500 };
 const typeId = { enum: ['A', 'B', 'C', 'D1', 'D2'] };
+
+const normalizedProfile = {
+  type: 'object',
+  additionalProperties: false,
+  required: [
+    'ability_clues',
+    'will_clues',
+    'tenure',
+    'perf_history',
+    'performance_cycles',
+    'coaching_history',
+    'goal',
+    'pain',
+  ],
+  properties: {
+    ability_clues: profileText,
+    will_clues: profileText,
+    tenure: profileText,
+    perf_history: profileText,
+    performance_cycles: profileText,
+    coaching_history: profileText,
+    goal: profileText,
+    pain: profileText,
+  },
+};
 
 const intakeResponse = {
   type: 'object',
@@ -41,30 +67,7 @@ const intakeResponse = {
       maxItems: 8,
       items: shortText,
     },
-    normalized_profile: {
-      type: 'object',
-      additionalProperties: false,
-      required: [
-        'ability_clues',
-        'will_clues',
-        'tenure',
-        'perf_history',
-        'performance_cycles',
-        'coaching_history',
-        'goal',
-        'pain',
-      ],
-      properties: {
-        ability_clues: profileText,
-        will_clues: profileText,
-        tenure: profileText,
-        perf_history: profileText,
-        performance_cycles: profileText,
-        coaching_history: profileText,
-        goal: profileText,
-        pain: profileText,
-      },
-    },
+    normalized_profile: normalizedProfile,
   },
 };
 
@@ -182,11 +185,12 @@ const feedbackResponse = {
 };
 
 const validateIntakeSchema = ajv.compile(intakeResponse);
+const validateNormalizedProfile = ajv.compile(normalizedProfile);
 const validateModelClassificationSchema = ajv.compile(modelClassificationResponse);
 const validateClassificationSchema = ajv.compile(classificationResponse);
-const validatePlan = ajv.compile(planResponse);
+const validatePlanSchema = ajv.compile(planResponse);
 const validatePlanStop = ajv.compile(planStopResponse);
-const validateFeedback = ajv.compile(feedbackResponse);
+const validateFeedbackSchema = ajv.compile(feedbackResponse);
 
 const classificationMappings = {
   '高|高': { quadrant: 'A', typeIds: ['A'] },
@@ -291,6 +295,23 @@ function validateClassification(payload) {
     && validateClassificationSemantics(payload, 'classification_confidence');
 }
 
+function validatePlan(payload, { typeId } = {}) {
+  if (!validatePlanSchema(payload) || !hasCompleteGrowScripts(payload.scripts)) {
+    return false;
+  }
+
+  if (typeId === 'B' || typeId === 'D2') {
+    return payload.gap_fix.some(hasCompleteSbi) && payload.scripts.some(hasCompleteSbi);
+  }
+
+  return true;
+}
+
+function validateFeedback(payload, { requireSbi = false } = {}) {
+  return validateFeedbackSchema(payload)
+    && (!requireSbi || payload.next_steps.some(hasCompleteSbi));
+}
+
 module.exports = {
   intakeResponse,
   modelClassificationResponse,
@@ -298,6 +319,7 @@ module.exports = {
   planResponse,
   planStopResponse,
   feedbackResponse,
+  validateNormalizedProfile,
   validateIntake,
   validateModelClassification,
   validateClassification,

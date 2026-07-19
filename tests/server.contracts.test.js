@@ -289,7 +289,10 @@ test('方案响应接受提示词步骤 3 的正常 JSON，并将停止结果隔
     cautions: ['避免将问题归因于个人态度'],
     frequency: '每周一次，连续四周复盘',
     gap_fix: ['将关键任务拆为可观察的小目标'],
-    scripts: ['我们先一起明确本周最重要的目标。', '你愿意在周五前完成哪一步行动？'],
+    scripts: [
+      'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。',
+      'Options（可选方案）：可在例会前或里程碑当天同步。Will（行动承诺）：周五前完成首次主动同步。',
+    ],
   };
   const stoppedPlan = {
     status: '停止生成',
@@ -304,6 +307,48 @@ test('方案响应接受提示词步骤 3 的正常 JSON，并将停止结果隔
   assert.equal(validatePlanStop(stoppedPlan), true);
   assert.equal(validatePlan(stoppedPlan), false);
   assert.equal(validatePlanStop({ ...stoppedPlan, steps: ['不得生成步骤'] }), false);
+});
+
+test('方案契约拒绝缺失、乱序或空内容的 GROW 阶段', () => {
+  const valid = {
+    entry: ['从本周协作目标切入。'],
+    cautions: ['只引用员工已提供的行为。'],
+    frequency: '每周一次复盘。',
+    gap_fix: ['把主动同步拆成可观察行为。'],
+    scripts: [
+      'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。',
+      'Options（可选方案）：可在例会前或里程碑当天同步。Will（行动承诺）：周五前完成首次主动同步。',
+    ],
+  };
+
+  assert.equal(validatePlan(valid, { typeId: 'A' }), true);
+  assert.equal(validatePlan({ ...valid, scripts: ['Goal（目标）：主动同步。', valid.scripts[1]] }, { typeId: 'A' }), false);
+  assert.equal(validatePlan({ ...valid, scripts: ['Reality（现状）：需提醒。Goal（目标）：主动同步。', valid.scripts[1]] }, { typeId: 'A' }), false);
+  assert.equal(validatePlan({ ...valid, scripts: [valid.scripts[0], 'Options（可选方案）：。Will（行动承诺）：周五执行。'] }, { typeId: 'A' }), false);
+});
+
+test('B 与 D2 方案同时要求 gap_fix 和 scripts 至少一项完整 SBI', () => {
+  const valid = {
+    entry: ['从本周协作目标切入。'],
+    cautions: ['避免人身评判。'],
+    frequency: '每周一次复盘。',
+    gap_fix: ['Situation（情境）：周一例会。Behavior（行为）：你会前主动同步风险。Impact（影响）：团队提前协调资源。'],
+    scripts: [
+      'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。Situation（情境）：上周评审。Behavior（行为）：你在会前整理了风险。Impact（影响）：团队及时调整了排期。',
+      'Options（可选方案）：可在例会前或里程碑当天同步。Will（行动承诺）：周五前完成首次主动同步。',
+    ],
+  };
+
+  for (const typeId of ['B', 'D2']) assert.equal(validatePlan(valid, { typeId }), true);
+  assert.equal(validatePlan({ ...valid, gap_fix: ['把任务拆小。'] }, { typeId: 'B' }), false);
+  assert.equal(validatePlan({ ...valid, scripts: [
+    'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。',
+    valid.scripts[1],
+  ] }, { typeId: 'D2' }), false);
+  assert.equal(validatePlan({ ...valid, gap_fix: ['把任务拆小。'], scripts: [
+    'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。',
+    valid.scripts[1],
+  ] }, { typeId: 'C' }), true);
 });
 
 test('反馈响应接受提示词步骤 4 的正常 JSON，并拒绝额外字段和边界外数组', () => {
@@ -324,4 +369,19 @@ test('反馈响应接受提示词步骤 4 的正常 JSON，并拒绝额外字段
     ...feedback,
     next_steps: [...feedback.next_steps, '补充第三步', '超出边界'],
   }), false);
+});
+
+test('非空反馈要求 next_steps 至少一条完整 SBI，空反馈不额外强制', () => {
+  const feedback = {
+    progress_read: '员工已愿意主动同步风险。',
+    next_steps: [
+      'Situation（情境）：周五复盘。Behavior（行为）：你主动同步了风险。Impact（影响）：团队提前安排了支持。',
+      '下周继续观察主动同步频率。',
+    ],
+    watch_points: ['观察是否持续主动同步。'],
+  };
+
+  assert.equal(validateFeedback(feedback, { requireSbi: true }), true);
+  assert.equal(validateFeedback({ ...feedback, next_steps: ['拆分任务。', '周五复盘。'] }, { requireSbi: true }), false);
+  assert.equal(validateFeedback({ ...feedback, next_steps: ['拆分任务。', '周五复盘。'] }, { requireSbi: false }), true);
 });

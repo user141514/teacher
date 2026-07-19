@@ -2,6 +2,7 @@ const {
   validateIntake,
   validateModelClassification,
   validateClassification,
+  validateNormalizedProfile,
   validatePlan,
   validateFeedback,
 } = require('./contracts.js');
@@ -18,17 +19,6 @@ const CLASSIFICATION_NOT_READY = Object.freeze({
   code: 'CLASSIFICATION_NOT_READY',
   message: '类型尚未完成判定，请先补充或人工确认。',
 });
-
-const NORMALIZED_PROFILE_KEYS = Object.freeze([
-  'ability_clues',
-  'will_clues',
-  'tenure',
-  'perf_history',
-  'performance_cycles',
-  'coaching_history',
-  'goal',
-  'pain',
-]);
 
 function controlledError(code) {
   const error = new Error(code);
@@ -90,14 +80,6 @@ function isBoundedData(value, { maxTextLength = 2000 } = {}) {
   return true;
 }
 
-function isNormalizedProfile(value) {
-  return isPlainRecord(value)
-    && Object.keys(value).length === NORMALIZED_PROFILE_KEYS.length
-    && NORMALIZED_PROFILE_KEYS.every((key) => (
-      typeof value[key] === 'string' && value[key].length <= 500
-    ));
-}
-
 function isInvalidRequestResult(value) {
   return value && value.ok === false && value.code === 'INVALID_REQUEST';
 }
@@ -157,7 +139,7 @@ function createCoachService({ promptLoader, client } = {}) {
   async function classify(request) {
     if (!isPlainRecord(request)
       || !onlyHasKeys(request, ['normalizedProfile'])
-      || !isNormalizedProfile(request.normalizedProfile)) {
+      || !validateNormalizedProfile(request.normalizedProfile)) {
       return INVALID_REQUEST;
     }
 
@@ -179,8 +161,9 @@ function createCoachService({ promptLoader, client } = {}) {
 
   async function plan(request) {
     if (!isPlainRecord(request)
-      || !onlyHasKeys(request, ['classification', 'pain', 'regenerate', 'previousPlan'])
+      || !onlyHasKeys(request, ['classification', 'normalizedProfile', 'pain', 'regenerate', 'previousPlan'])
       || !isPlainRecord(request.classification)
+      || !validateNormalizedProfile(request.normalizedProfile)
       || typeof request.pain !== 'string'
       || request.pain.length > 2000
       || !Object.hasOwn(request, 'regenerate')
@@ -199,17 +182,21 @@ function createCoachService({ promptLoader, client } = {}) {
       return CLASSIFICATION_NOT_READY;
     }
 
+    const validate = (payload) => validatePlan(payload, {
+      typeId: request.classification.type_id,
+    });
     const result = await completeStep(3, {
       classification_status: request.classification.status,
       type_id: request.classification.type_id,
       strategy: request.classification.strategy,
       coach_mode: request.classification.coach_mode,
       classification_reason: request.classification.reason,
+      normalized_profile: request.normalizedProfile,
       high_risk_personnel_action: false,
       pain: request.pain,
       regenerate: request.regenerate === true,
       previous_plan: request.previousPlan,
-    }, validatePlan, 0.55, 1400);
+    }, validate, 0.55, 1400);
     const highRiskIntent = findHighRiskIntent(result);
 
     return highRiskIntent ? { blocked: true, ...highRiskIntent } : result;
@@ -234,6 +221,9 @@ function createCoachService({ promptLoader, client } = {}) {
       return CLASSIFICATION_NOT_READY;
     }
 
+    const validate = (payload) => validateFeedback(payload, {
+      requireSbi: request.feedbackText.trim().length > 0,
+    });
     const result = await completeStep(4, {
       type_id: request.classification.type_id,
       strategy: request.classification.strategy,
@@ -241,7 +231,7 @@ function createCoachService({ promptLoader, client } = {}) {
       classification_reason: request.classification.reason,
       plan_summary: request.planSummary,
       feedback_text: request.feedbackText,
-    }, validateFeedback, 0.55, 1000);
+    }, validate, 0.55, 1000);
     const highRiskIntent = findHighRiskIntent(result);
 
     return highRiskIntent ? { blocked: true, ...highRiskIntent } : result;

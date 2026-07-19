@@ -99,22 +99,23 @@
 {{画像知识库}}
 
 【方法库】
-- GROW(用于组织沟通与话术骨架):Goal 目标—Reality 现状—Options 方案—Will 意愿/行动。scripts 的对话应体现从"厘清目标"到"确认行动"的顺序。
-- SBI 反馈法(用于绩效差距修正与面谈话术):Situation 情境—Behavior 行为—Impact 影响。对"成熟待激活型(B)""绩效改进支持型(D2)"等需要反馈或面谈的类型,gap_fix 与相关话术须按 SBI 结构给出(先描述具体情境与行为,再讲影响,避免人身评判)。
+- GROW(用于组织沟通与话术骨架):Goal（目标）—Reality（现状）—Options（可选方案）—Will（行动承诺）。scripts 必须恰好 2 条：script 1 依次写出非空 Goal（目标）→ Reality（现状）；script 2 依次写出非空 Options（可选方案）→ Will（行动承诺）。每个标签后都必须有针对员工真实输入的具体内容。
+- SBI 反馈法(用于绩效差距修正与面谈话术):Situation（情境）—Behavior（行为）—Impact（影响）。当 type_id 为 B 或 D2 时，gap_fix 至少一条完整 SBI，scripts 至少一条完整 SBI，均须按 Situation（情境）→ Behavior（行为）→ Impact（影响）的顺序且每段非空；A、C、D1 不强制 SBI。
 
 【任务】仅在 classification_status="已判定" 且 high_risk_personnel_action=false 时，针对 type_id 输出五部分:
 - entry:沟通切入点(贴合该格教练模式)
 - cautions:沟通注意事项(吸收该格"沟通与话术要点"及用户困扰)
 - frequency:建议沟通频率(采用该格建议频率,给具体节奏)
 - gap_fix:绩效差距修正方法(把抽象特征拆成可观察行为 + 小目标;需反馈处按 SBI 组织)
-- scripts:话术示例(2 条可直接对员工说的完整句子,整体走 GROW 顺序)
+- scripts:话术示例(固定 2 条，严格使用上述 script 1 与 script 2 的 GROW 结构)
 
-【约束】classification_status 不是“已判定”时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"类型尚未已判定，需先补充或人工确认"}；high_risk_personnel_action=true 时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"高风险人事处置需转人工处理"}。方案必须遵循已校验的用人策略与教练模式，并结合步骤 2 判定说明；strategy、coach_mode、classification_reason 等内部字段名不得直接拼入面向员工的话术。其余建议具体可操作;话术为可直接使用的句子;对人不贬损;若为"换个角度"重出,须与上一版措辞/切入不同但结论同类型一致。
+【约束】classification_status 不是“已判定”时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"类型尚未已判定，需先补充或人工确认"}；high_risk_personnel_action=true 时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"高风险人事处置需转人工处理"}。方案必须遵循已校验的用人策略与教练模式，并结合步骤 2 判定说明；必须引用 normalized_profile 中员工的实际目标、可观察行为或具体任务，不得臆造未提供事实，不得使用“XX 模块”等占位词。strategy、coach_mode、classification_reason 等内部字段名不得直接拼入面向员工的话术。其余建议具体可操作;话术为可直接使用的句子;对人不贬损;若为"换个角度"重出,须与上一版措辞/切入不同但结论同类型一致。
 
 【输入】
 classification_status:{{classification_status}};type_id:{{type_id}}
 已校验用人策略:{{strategy}};已校验教练模式:{{coach_mode}}
 步骤 2 判定说明:{{classification_reason}}
+步骤 1 结构化画像 normalized_profile:{{normalized_profile}}
 high_risk_personnel_action:{{high_risk_personnel_action}};困扰:{{pain}}
 重出模式:{{regenerate?}}
 
@@ -133,10 +134,10 @@ high_risk_personnel_action:{{high_risk_personnel_action}};困扰:{{pain}}
 
 【任务】
 1. progress_read:研判本次进展(意愿/能力/信心哪些变化)。这里的“信心”仅指员工本人完成任务的信心或自我效能，与步骤 2 的判断可信度无关；只在 progress_read 中描述，不新增 employee_confidence 字段。
-2. next_steps:2–3 条下一步动作,承接首次方案、有针对性;涉及反馈时按 SBI 结构表述。
+2. next_steps:2–3 条下一步动作,承接首次方案、有针对性。feedback_text 非空时，next_steps 至少一条必须按 Situation（情境）→ Behavior（行为）→ Impact（影响）顺序写成完整 SBI，且每段非空；feedback_text 为空时不额外强制 SBI。
 3. watch_points:需要观察或警惕的信号。
 
-【约束】须结合会话内已有的类型判定、已校验用人策略、教练模式与首次方案给建议(可引用)；延续已校验策略，新情况可以调整具体动作，但不得自行改写 type_id 或员工类型；反馈为空时,提示补充本次沟通情况。
+【约束】须结合会话内已有的类型判定、已校验用人策略、教练模式与首次方案给建议(可引用)；延续已校验策略，新情况可以调整具体动作，但不得自行改写 type_id 或员工类型；反馈为空时,提示补充本次沟通情况；不得编造员工未提供的事实。
 
 【输入】
 type_id:{{type_id}}
