@@ -66,6 +66,12 @@ npm.cmd install
 
 运行状态可通过 `GET /api/health` 检查。
 
+### 步骤 2 字段语义
+
+DeepSeek 原始分类响应使用 `confidence`；服务端校验后会显式转换为应用/API 字段 `classification_confidence`，页面将其显示为“判断可信度”。该字段表示类型判定的可靠程度，与员工自身信心 `employee_confidence` 是两个不同概念。
+
+已判定结果还会返回严格映射的 `strategy`、`coach_mode` 以及引用具体输入证据的 `reason`。当状态为“待补充”或“待人工确认”时，`type_id`、`strategy` 和 `coach_mode` 均不会生成，并且接口不允许进入方案生成。
+
 ## 测试
 
 ```powershell
