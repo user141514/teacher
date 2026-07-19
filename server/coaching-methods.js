@@ -30,10 +30,11 @@ function parseLabeledStages(value) {
   }));
 }
 
-function containsExactStages(value, requiredNames) {
+function containsExactStages(value, requiredNames, analyzedNames = requiredNames) {
   const requiredLabels = requiredNames.map((name) => STAGE_LABELS[name]);
+  const analyzedLabels = analyzedNames.map((name) => STAGE_LABELS[name]);
   const stages = parseLabeledStages(value)
-    .filter((stage) => requiredLabels.includes(stage.label));
+    .filter((stage) => analyzedLabels.includes(stage.label));
 
   return stages.length === requiredLabels.length
     && stages.every((stage, index) => (
@@ -42,10 +43,11 @@ function containsExactStages(value, requiredNames) {
 }
 
 function hasCompleteGrowScripts(scripts) {
+  const growNames = ['Goal', 'Reality', 'Options', 'Will'];
   return Array.isArray(scripts)
     && scripts.length >= 2
-    && containsExactStages(scripts[0], ['Goal', 'Reality'])
-    && containsExactStages(scripts[1], ['Options', 'Will']);
+    && containsExactStages(scripts[0], ['Goal', 'Reality'], growNames)
+    && containsExactStages(scripts[1], ['Options', 'Will'], growNames);
 }
 
 function hasCompleteSbi(value) {

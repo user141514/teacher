@@ -15,8 +15,10 @@ test('GROW 要求两条话术分别按顺序包含非空 Goal/Reality 与 Option
   assert.equal(hasCompleteGrowScripts(['Goal（目标）：本周达成目标。', 'Options（可选方案）：先试一次。Will（行动承诺）：周五复盘。']), false);
   assert.equal(hasCompleteGrowScripts(['Reality（现状）：仍需提醒。Goal（目标）：主动同步。', 'Options（可选方案）：每日同步。Will（行动承诺）：周五执行。']), false);
   assert.equal(hasCompleteGrowScripts(['Reality（现状）：仍需提醒。Goal（目标）：主动同步。Reality（现状）：需要主管提醒。', 'Options（可选方案）：每日同步。Will（行动承诺）：周五执行。']), false);
+  assert.equal(hasCompleteGrowScripts(['Options（可选方案）：每日同步。Goal（目标）：主动同步。Reality（现状）：仍需提醒。', 'Options（可选方案）：每日同步。Will（行动承诺）：周五执行。']), false);
   assert.equal(hasCompleteGrowScripts(['Goal（目标）：  \nReality（现状）：仍需提醒。', 'Options（可选方案）：每日同步。Will（行动承诺）：周五执行。']), false);
   assert.equal(hasCompleteGrowScripts(['Goal（目标）：主动同步。Reality（现状）：仍需提醒。', 'Will（行动承诺）：周五执行。Options（可选方案）：每日同步。']), false);
+  assert.equal(hasCompleteGrowScripts(['Goal（目标）：主动同步。Reality（现状）：仍需提醒。', 'Goal（目标）：主动同步。Reality（现状）：仍需提醒。Options（可选方案）：每日同步。Will（行动承诺）：周五执行。']), false);
 });
 
 test('SBI 要求标签式 Situation/Behavior/Impact 按序且内容非空', () => {
