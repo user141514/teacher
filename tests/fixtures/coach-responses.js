@@ -44,7 +44,10 @@ function classified() {
     quadrant: 'B',
     type_id: 'B',
     status: '已判定',
-    confidence: '中',
+    classification_confidence: '中',
+    strategy: '激发意愿',
+    coach_mode: '诱导式',
+    reason: '员工已能独立交付复杂任务，但近期主动性不足。',
     evidence: ['已能独立交付复杂任务', '近期主动性不足'],
     questions: [],
   });

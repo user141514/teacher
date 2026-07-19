@@ -207,9 +207,12 @@ function renderClassification(root, state, handlers) {
   const details = node('div', { className: 'rcard' });
   const rows = [
     ['判定状态', classification.status],
-    ['置信度', classification.confidence],
+    ['判断可信度', classification.classification_confidence],
     ['能力', classification.ability],
     ['意愿', classification.will],
+    ['策略', classification.strategy],
+    ['教练模式', classification.coach_mode],
+    ['具体依据', classification.reason],
   ];
   rows.forEach(([label, value]) => {
     const row = node('p');
