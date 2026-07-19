@@ -58,8 +58,11 @@ function coachingPlan() {
     entry: ['**先认可**其交付能力，再约定挑战目标。'],
     cautions: ['避免把跟进变成查岗。'],
     frequency: '每周一次 1v1（15 分钟）',
-    gap_fix: ['把主动同步拆成每周一个可观察行为。'],
-    scripts: ['“这块你比我熟，想听你的方案。”', '“这次由你拍板，我会兜底。”'],
+    gap_fix: ['**Situation（情境）**：周一项目例会；**Behavior（行为）**：你在会前主动同步风险；**Impact（影响）**：团队提前协调了资源。'],
+    scripts: [
+      '**Goal（目标）**：本周独立推进一次项目同步。**Reality（现状）**：目前交代的事不追就停。**Situation（情境）**：上周项目评审；**Behavior（行为）**：你在提醒后才同步风险；**Impact（影响）**：团队只能临时调整资源。',
+      '**Options（可选方案）**：可选择例会前或里程碑当天主动同步。**Will（行动承诺）**：周五前完成首次主动同步。',
+    ],
   });
 }
 
@@ -68,15 +71,18 @@ function nextPlan() {
     entry: ['从近期成果切入，邀请他选择挑战任务。'],
     cautions: ['保留决策空间。'],
     frequency: '每周一次复盘',
-    gap_fix: ['用里程碑反馈强化主动行为。'],
-    scripts: ['“你愿意先试哪一步？”', '“需要支持时及时告诉我。”'],
+    gap_fix: ['Situation（情境）：下次里程碑评审。Behavior（行为）：员工提前同步风险。Impact（影响）：团队可以预先安排支持。'],
+    scripts: [
+      'Goal（目标）：下次评审前主动同步风险。Reality（现状）：当前仍需要主管追问。Situation（情境）：本周协作。Behavior（行为）：你在提醒后完成同步。Impact（影响）：资源安排时间较紧。',
+      'Options（可选方案）：可用固定模板或日历提醒。Will（行动承诺）：下次评审前一天完成同步。',
+    ],
   });
 }
 
 function coachingFeedback() {
   return envelope({
     progress_read: '**进展：** 已愿意主动接一个模块。',
-    next_steps: ['把任务拆成两个小阶段。', '一周后复盘主动性。'],
+    next_steps: ['Situation（情境）：周五复盘。Behavior（行为）：你主动同步了项目风险。Impact（影响）：团队提前安排了支持。', '把任务拆成两个小阶段，一周后复盘主动性。'],
     watch_points: ['避免只关注结果，忽略主动行为。'],
   });
 }

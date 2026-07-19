@@ -155,6 +155,20 @@ test('换个角度会用 regenerate=true 请求新的方案', async ({ page }) =
   const planRequests = requests.filter((item) => item.method === 'plan');
   expect(planRequests[0].body).toMatchObject({ regenerate: false, previousPlan: null });
   expect(planRequests[1].body).toMatchObject({ regenerate: true });
+  const normalizedProfile = requests.find((item) => item.method === 'classify').body.normalizedProfile;
+  expect(planRequests[0].body.normalizedProfile).toEqual(normalizedProfile);
+  expect(planRequests[1].body.normalizedProfile).toEqual(normalizedProfile);
+});
+
+test('方案页可见完整 GROW 与 B 类型的 SBI 标签', async ({ page }) => {
+  await advanceToPlan(page);
+
+  for (const label of ['Goal（目标）', 'Reality（现状）', 'Options（可选方案）', 'Will（行动承诺）']) {
+    await expect(page.locator('#plan-scripts')).toContainText(label);
+  }
+  for (const label of ['Situation（情境）', 'Behavior（行为）', 'Impact（影响）']) {
+    await expect(page.locator('#coach-plan')).toContainText(label);
+  }
 });
 
 test('类型结果和流程步骤使用非交互类型卡片与命名导航语义', async ({ page }) => {
@@ -304,11 +318,15 @@ test('辅导反馈的模型建议通过 Markdown 渲染器展示', async ({ page
   await expect(page.locator('#coach-plan .markdown-body')).toHaveCount(4);
   await expect(page.locator('#coach-plan .markdown-body').first().locator('strong')).toContainText('先认可');
   await page.getByRole('button', { name: '去反馈' }).click();
+  await page.getByLabel('本次沟通后的情况').fill('员工本周主动同步了项目风险。');
   await page.getByRole('button', { name: '生成下一步建议' }).click();
 
   const output = page.locator('#followout .markdown-body');
   await expect(output.locator('strong')).toContainText('进展');
   await expect(output.first()).not.toContainText('**进展：**');
+  await expect(page.locator('#feedback-next-steps')).toContainText('Situation（情境）');
+  await expect(page.locator('#feedback-next-steps')).toContainText('Behavior（行为）');
+  await expect(page.locator('#feedback-next-steps')).toContainText('Impact（影响）');
 });
 
 test('窄屏教练方案页不会产生整页横向滚动', async ({ page }) => {

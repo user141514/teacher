@@ -121,6 +121,7 @@ async function requestPlan(regenerate) {
   render();
   const result = await generatePlan({
     classification: session.classification,
+    normalizedProfile: session.intakeResult && session.intakeResult.normalized_profile,
     pain: session.intake.pain || '',
     regenerate,
     previousPlan: regenerate ? session.plan : null,
