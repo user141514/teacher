@@ -174,9 +174,10 @@ test('类型判定显示判断可信度、策略、教练模式和具体依据',
 
   const details = page.locator('.rcard').filter({ hasText: '判定状态' });
   await expect(details).toContainText('判断可信度：中');
-  await expect(details).toContainText('策略：激发意愿');
+  await expect(details).toContainText('用人策略：激发意愿');
   await expect(details).toContainText('教练模式：诱导式');
-  await expect(details).toContainText('具体依据：员工已能独立交付复杂任务，但近期主动性不足。');
+  await expect(details.getByRole('heading', { name: '判定说明' })).toBeVisible();
+  await expect(details).toContainText('员工已能独立交付复杂任务，但近期主动性不足。');
 });
 
 test('离开方案后延迟的换个角度响应不会覆盖反馈页面', async ({ page }) => {

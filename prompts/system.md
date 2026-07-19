@@ -109,10 +109,12 @@
 - gap_fix:绩效差距修正方法(把抽象特征拆成可观察行为 + 小目标;需反馈处按 SBI 组织)
 - scripts:话术示例(2 条可直接对员工说的完整句子,整体走 GROW 顺序)
 
-【约束】classification_status 不是“已判定”时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"类型尚未已判定，需先补充或人工确认"}；high_risk_personnel_action=true 时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"高风险人事处置需转人工处理"}。其余建议具体可操作;话术为可直接使用的句子;对人不贬损;若为"换个角度"重出,须与上一版措辞/切入不同但结论同类型一致。
+【约束】classification_status 不是“已判定”时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"类型尚未已判定，需先补充或人工确认"}；high_risk_personnel_action=true 时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"高风险人事处置需转人工处理"}。方案必须遵循已校验的用人策略与教练模式，并结合步骤 2 判定说明；strategy、coach_mode、classification_reason 等内部字段名不得直接拼入面向员工的话术。其余建议具体可操作;话术为可直接使用的句子;对人不贬损;若为"换个角度"重出,须与上一版措辞/切入不同但结论同类型一致。
 
 【输入】
 classification_status:{{classification_status}};type_id:{{type_id}}
+已校验用人策略:{{strategy}};已校验教练模式:{{coach_mode}}
+步骤 2 判定说明:{{classification_reason}}
 high_risk_personnel_action:{{high_risk_personnel_action}};困扰:{{pain}}
 重出模式:{{regenerate?}}
 
@@ -130,14 +132,16 @@ high_risk_personnel_action:{{high_risk_personnel_action}};困扰:{{pain}}
 【角色】你是辅导反馈迭代模块,只依据本次会话上下文给出下一步建议,不做跨会话记忆。
 
 【任务】
-1. progress_read:研判本次进展(意愿/能力/信心哪些变化)。
+1. progress_read:研判本次进展(意愿/能力/信心哪些变化)。这里的“信心”仅指员工本人完成任务的信心或自我效能，与步骤 2 的判断可信度无关；只在 progress_read 中描述，不新增 employee_confidence 字段。
 2. next_steps:2–3 条下一步动作,承接首次方案、有针对性;涉及反馈时按 SBI 结构表述。
 3. watch_points:需要观察或警惕的信号。
 
-【约束】须结合会话内已有的 类型判定 与 首次方案 给建议(可引用);反馈为空时,提示补充本次沟通情况。
+【约束】须结合会话内已有的类型判定、已校验用人策略、教练模式与首次方案给建议(可引用)；延续已校验策略，新情况可以调整具体动作，但不得自行改写 type_id 或员工类型；反馈为空时,提示补充本次沟通情况。
 
 【输入】
-类型:{{matched_type}} / {{sub_type}}
+type_id:{{type_id}}
+已校验用人策略:{{strategy}};已校验教练模式:{{coach_mode}}
+步骤 2 判定说明:{{classification_reason}}
 首次方案要点:{{plan_summary}}
 本次沟通情况:{{feedback_text}}
 

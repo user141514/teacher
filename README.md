@@ -68,7 +68,7 @@ npm.cmd install
 
 ### 步骤 2 字段语义
 
-DeepSeek 原始分类响应使用 `confidence`；服务端校验后会显式转换为应用/API 字段 `classification_confidence`，页面将其显示为“判断可信度”。该字段表示类型判定的可靠程度，与员工自身信心 `employee_confidence` 是两个不同概念。
+DeepSeek 原始分类响应使用 `confidence`；服务端校验后会显式转换为应用/API 字段 `classification_confidence`，页面将其显示为“判断可信度”。该字段只表示类型判定的可靠程度，不是员工本人完成任务的信心。员工信心当前只在步骤 4 的 `progress_read` 叙述中描述，本期不新增 `employee_confidence` 字段。
 
 已判定结果还会返回严格映射的 `strategy`、`coach_mode` 以及引用具体输入证据的 `reason`。当状态为“待补充”或“待人工确认”时，`type_id`、`strategy` 和 `coach_mode` 均不会生成，并且接口不允许进入方案生成。
 

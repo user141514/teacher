@@ -204,7 +204,7 @@ function createCoachService({ promptLoader, client } = {}) {
       type_id: request.classification.type_id,
       strategy: request.classification.strategy,
       coach_mode: request.classification.coach_mode,
-      reason: request.classification.reason,
+      classification_reason: request.classification.reason,
       high_risk_personnel_action: false,
       pain: request.pain,
       regenerate: request.regenerate === true,
@@ -238,7 +238,7 @@ function createCoachService({ promptLoader, client } = {}) {
       type_id: request.classification.type_id,
       strategy: request.classification.strategy,
       coach_mode: request.classification.coach_mode,
-      reason: request.classification.reason,
+      classification_reason: request.classification.reason,
       plan_summary: request.planSummary,
       feedback_text: request.feedbackText,
     }, validateFeedback, 0.55, 1000);

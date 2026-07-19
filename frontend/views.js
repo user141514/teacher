@@ -1,4 +1,4 @@
-import { typeLabel } from './labels.js';
+import { CLASSIFICATION_LABELS, typeLabel } from './labels.js';
 
 const STEPS = [
   ['员工信息输入', '特征 + 绩效期望'],
@@ -206,19 +206,22 @@ function renderClassification(root, state, handlers) {
 
   const details = node('div', { className: 'rcard' });
   const rows = [
-    ['判定状态', classification.status],
-    ['判断可信度', classification.classification_confidence],
-    ['能力', classification.ability],
-    ['意愿', classification.will],
-    ['策略', classification.strategy],
-    ['教练模式', classification.coach_mode],
-    ['具体依据', classification.reason],
+    [CLASSIFICATION_LABELS.status, classification.status],
+    [CLASSIFICATION_LABELS.classification_confidence, classification.classification_confidence],
+    [CLASSIFICATION_LABELS.ability, classification.ability],
+    [CLASSIFICATION_LABELS.will, classification.will],
+    [CLASSIFICATION_LABELS.strategy, classification.strategy],
+    [CLASSIFICATION_LABELS.coach_mode, classification.coach_mode],
   ];
   rows.forEach(([label, value]) => {
     const row = node('p');
     row.append(node('strong', { text: `${label}：` }), document.createTextNode(value || '未提供'));
     details.append(row);
   });
+  details.append(
+    node('h3', { className: 'rcard-h', text: CLASSIFICATION_LABELS.reason }),
+    node('p', { text: classification.reason || '未提供' }),
+  );
   details.append(node('h3', { className: 'rcard-h', text: '判定证据' }));
   appendQuestions(details, classification.evidence);
   if (classification.questions.length > 0) {
