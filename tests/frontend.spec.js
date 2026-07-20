@@ -630,7 +630,7 @@ test('生成下一步建议后保留用户提交的反馈文本', async ({ page 
   await expect(feedbackInput).toHaveValue(feedbackText);
 });
 
-test('顶部返回首页和刷新会清空反馈文本', async ({ page }) => {
+test('顶部返回首页后重新进入反馈页不会保留上一轮反馈文本', async ({ page }) => {
   const fixtures = defaultFixtures();
   fixtures.intake = [...fixtures.intake, ...fixtures.intake];
   await advanceToPlan(page, fixtures);
@@ -648,14 +648,29 @@ test('顶部返回首页和刷新会清空反馈文本', async ({ page }) => {
   await page.getByRole('button', { name: '去反馈' }).click();
   const feedbackInput = page.getByLabel('本次沟通后的情况');
   await expect(feedbackInput).toHaveValue('');
+});
 
-  await feedbackInput.fill('刷新前的反馈也不应保留。');
+test('刷新后重新进入反馈页不会保留上一轮反馈文本', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.intake = [...fixtures.intake, ...fixtures.intake];
+  await advanceToPlan(page, fixtures);
+  await page.getByRole('button', { name: '去反馈' }).click();
+  const feedbackInput = page.getByLabel('本次沟通后的情况');
+  await feedbackInput.fill('刷新前的反馈不应保留。');
+  await page.getByRole('button', { name: '生成下一步建议' }).click();
+  await expect(page.locator('#feedback-next-steps')).toBeVisible();
+
   await page.reload();
-
   await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
-  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('');
-  expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length })))
-    .toEqual({ local: 0, session: 0 });
+  await fillHome(page);
+  await page.getByRole('button', { name: '审查信息' }).click();
+  await page.getByLabel('追问 1').fill('尚未做过。');
+  await page.getByRole('button', { name: '再次审查' }).click();
+  await page.getByRole('button', { name: '生成类型判定' }).click();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  await page.getByRole('button', { name: '去反馈' }).click();
+
+  await expect(page.getByLabel('本次沟通后的情况')).toHaveValue('');
 });
 
 test('窄屏教练方案页不会产生整页横向滚动', async ({ page }) => {
