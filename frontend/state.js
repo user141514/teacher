@@ -1,6 +1,6 @@
 const SESSION_KEYS = new Set([
   'screen', 'step', 'busy', 'intake', 'answers', 'intakeResult',
-  'classification', 'plan', 'feedback', 'blocked', 'error',
+  'classification', 'plan', 'feedback', 'feedbackText', 'blocked', 'error',
 ]);
 
 export function createInitialState() {
@@ -15,6 +15,7 @@ export function createInitialState() {
     classification: null,
     plan: null,
     feedback: null,
+    feedbackText: '',
     blocked: null,
     error: null,
   };
@@ -61,6 +62,10 @@ export function setPlan(plan) {
 
 export function setFeedback(feedback) {
   updateSession({ feedback });
+}
+
+export function setFeedbackText(feedbackText) {
+  updateSession({ feedbackText: String(feedbackText || '') });
 }
 
 export function setBlocked(blocked) {

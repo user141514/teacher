@@ -616,6 +616,48 @@ test('辅导反馈的模型建议通过 Markdown 渲染器展示', async ({ page
   await expect(page.locator('#feedback-next-steps')).toContainText('Impact（影响）');
 });
 
+test('生成下一步建议后保留用户提交的反馈文本', async ({ page }) => {
+  const feedbackText = '员工本周主动同步了项目风险，并按约定提交了里程碑。';
+  await advanceToPlan(page);
+  await page.getByRole('button', { name: '去反馈' }).click();
+  const feedbackInput = page.getByLabel('本次沟通后的情况');
+  await feedbackInput.fill(feedbackText);
+  await page.getByRole('button', { name: '生成下一步建议' }).click();
+
+  await expect(page.locator('#feedback-next-steps')).toContainText('Situation（情境）');
+  await expect(page.locator('#feedback-next-steps')).toContainText('Behavior（行为）');
+  await expect(page.locator('#feedback-next-steps')).toContainText('Impact（影响）');
+  await expect(feedbackInput).toHaveValue(feedbackText);
+});
+
+test('顶部返回首页和刷新会清空反馈文本', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.intake = [...fixtures.intake, ...fixtures.intake];
+  await advanceToPlan(page, fixtures);
+  await page.getByRole('button', { name: '去反馈' }).click();
+  await page.getByLabel('本次沟通后的情况').fill('第一轮反馈不应带入下一轮。');
+  await page.locator('#top-return-home').click();
+
+  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await fillHome(page);
+  await page.getByRole('button', { name: '审查信息' }).click();
+  await page.getByLabel('追问 1').fill('尚未做过。');
+  await page.getByRole('button', { name: '再次审查' }).click();
+  await page.getByRole('button', { name: '生成类型判定' }).click();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  await page.getByRole('button', { name: '去反馈' }).click();
+  const feedbackInput = page.getByLabel('本次沟通后的情况');
+  await expect(feedbackInput).toHaveValue('');
+
+  await feedbackInput.fill('刷新前的反馈也不应保留。');
+  await page.reload();
+
+  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('');
+  expect(await page.evaluate(() => ({ local: localStorage.length, session: sessionStorage.length })))
+    .toEqual({ local: 0, session: 0 });
+});
+
 test('窄屏教练方案页不会产生整页横向滚动', async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 700 });
   await advanceToPlan(page);

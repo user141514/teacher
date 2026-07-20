@@ -8,6 +8,7 @@ import {
   setClassification,
   setError,
   setFeedback,
+  setFeedbackText,
   setIntake,
   setIntakeResult,
   setPlan,
@@ -134,6 +135,7 @@ async function requestPlan(regenerate) {
 }
 
 async function generateFeedback(feedbackText) {
+  setFeedbackText(feedbackText);
   setError(null);
   setBusy(true);
   render();

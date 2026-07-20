@@ -450,7 +450,7 @@ function renderPlan(root, state, handlers) {
 
 function renderFeedback(root, state, handlers) {
   const { fragment, body, panel } = createWorkspace(state, '辅导反馈', '回填本次沟通后的情况，系统将给出下一步调整建议。');
-  body.append(textAreaField('feedback-text', '本次沟通后的情况', '', '例：他愿意主动接一个模块，但仍担心做不好。'));
+  body.append(textAreaField('feedback-text', '本次沟通后的情况', state.feedbackText || '', '例：他愿意主动接一个模块，但仍担心做不好。'));
   appendError(body, state.error);
   if (state.feedback) {
     const output = node('div', { className: 'report', id: 'followout' });
