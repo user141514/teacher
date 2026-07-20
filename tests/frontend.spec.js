@@ -374,6 +374,64 @@ test('阶段格式化保护 Markdown 代码上下文中的容器围栏', async (
     .toHaveText('Reality（现状）：真实现状。');
 });
 
+test('阶段格式化按 Markdown fence 规则区分四空格缩进代码', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.plan = [envelope({
+    entry: ['普通切入点。'],
+    cautions: ['保持观察。'],
+    frequency: '每周一次',
+    gap_fix: [
+      '    ```',
+      'Goal（目标）：真实目标。Reality（现状）：真实现状。',
+    ],
+    scripts: ['保留普通话术。'],
+  })];
+  await advanceToPlan(page, fixtures);
+
+  const gapFix = page.locator('#plan-gap-fix');
+  await expect(gapFix.locator('pre code')).toHaveText('```\n');
+  await expectStageLabelsInSeparateParagraphs(
+    gapFix,
+    ['Goal（目标）', 'Reality（现状）'],
+  );
+  await expect(gapFix.locator('p').filter({ hasText: '真实目标' }))
+    .toHaveText('Goal（目标）：真实目标。');
+  await expect(gapFix.locator('p').filter({ hasText: '真实现状' }))
+    .toHaveText('Reality（现状）：真实现状。');
+});
+
+test('阶段格式化按 Markdown fence 规则忽略代码内的容器状伪关闭行', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.plan = [envelope({
+    entry: ['普通切入点。'],
+    cautions: ['保持观察。'],
+    frequency: '每周一次',
+    gap_fix: [
+      '```text',
+      '> ```',
+      'Goal（目标）：代码内容',
+      '```',
+      '',
+      'Goal（目标）：真实内容。Reality（现状）：真实内容。',
+    ],
+    scripts: ['保留普通话术。'],
+  })];
+  await advanceToPlan(page, fixtures);
+
+  const gapFix = page.locator('#plan-gap-fix');
+  await expect(gapFix.locator('pre')).toHaveCount(1);
+  await expect(gapFix.locator('pre code'))
+    .toHaveText('> ```\nGoal（目标）：代码内容\n');
+  await expectStageLabelsInSeparateParagraphs(
+    gapFix,
+    ['Goal（目标）', 'Reality（现状）'],
+  );
+  await expect(gapFix.locator('p').filter({ hasText: '真实内容' }).nth(0))
+    .toHaveText('Goal（目标）：真实内容。');
+  await expect(gapFix.locator('p').filter({ hasText: '真实内容' }).nth(1))
+    .toHaveText('Reality（现状）：真实内容。');
+});
+
 test('阶段格式化保护 Markdown 代码上下文中的跨行 code span', async ({ page }) => {
   const fixtures = defaultFixtures();
   fixtures.plan = [envelope({

@@ -174,21 +174,58 @@ function findInlineCodeRanges(markdown, excludedRanges) {
   return ranges;
 }
 
-function stripBlockquoteAndIndent(line) {
-  let content = line;
-  let quotePrefix = content.match(/^[ \t]*>[ \t]?/);
-  while (quotePrefix) {
-    content = content.slice(quotePrefix[0].length);
-    quotePrefix = content.match(/^[ \t]*>[ \t]?/);
+function consumeBlockquotePrefix(line, expectedDepth) {
+  let cursor = 0;
+  let depth = 0;
+  while (expectedDepth === undefined || depth < expectedDepth) {
+    const quote = line.slice(cursor).match(/^ {0,3}> ?/);
+    if (!quote) break;
+    cursor += quote[0].length;
+    depth += 1;
   }
-  return content.replace(/^[ \t]+/, '');
+  if (expectedDepth !== undefined && depth !== expectedDepth) return null;
+  return { cursor, depth };
 }
 
-function stripFenceOpeningPrefix(line) {
-  let content = stripBlockquoteAndIndent(line);
-  const listPrefix = content.match(/^(?:[-+*]|\d+[.)])[ \t]+/);
-  if (listPrefix) content = content.slice(listPrefix[0].length);
-  return content.replace(/^[ \t]+/, '');
+function parseFenceOpening(line) {
+  const quote = consumeBlockquotePrefix(line);
+  let content = line.slice(quote.cursor);
+  const leadingSpaces = content.match(/^ */)[0].length;
+  if (leadingSpaces > 3) return null;
+  content = content.slice(leadingSpaces);
+
+  let listIndent = 0;
+  const listPrefix = content.match(/^([-+*]|\d+[.)])( +)/);
+  if (listPrefix) {
+    listIndent = leadingSpaces + listPrefix[1].length + listPrefix[2].length;
+    content = content.slice(listPrefix[0].length);
+  }
+
+  const opening = content.match(/^(`{3,}|~{3,})(.*)$/);
+  if (!opening || (opening[1][0] === '`' && opening[2].includes('`'))) return null;
+  return {
+    marker: opening[1][0],
+    length: opening[1].length,
+    quoteDepth: quote.depth,
+    listIndent,
+  };
+}
+
+function isFenceClosingLine(line, fence) {
+  const quote = consumeBlockquotePrefix(line, fence.quoteDepth);
+  if (!quote) return false;
+  let content = line.slice(quote.cursor);
+  const leadingSpaces = content.match(/^ */)[0].length;
+  if (fence.listIndent > 0) {
+    if (leadingSpaces < fence.listIndent || leadingSpaces - fence.listIndent > 3) return false;
+  } else if (leadingSpaces > 3) {
+    return false;
+  }
+  content = content.slice(leadingSpaces);
+  const closingFence = new RegExp(
+    `^${escapeRegExp(fence.marker)}{${fence.length},}[ \\t]*$`,
+  );
+  return closingFence.test(content);
 }
 
 function inspectMarkdownLines(markdown) {
@@ -209,14 +246,11 @@ function inspectMarkdownLines(markdown) {
 
     if (fence) {
       fencedRanges.push([lineStart, separatorEnd]);
-      const closingFence = new RegExp(
-        `^${escapeRegExp(fence.marker)}{${fence.length},}[ \\t]*$`,
-      );
-      if (closingFence.test(stripBlockquoteAndIndent(text))) fence = null;
+      if (isFenceClosingLine(text, fence)) fence = null;
     } else {
-      const openingFence = stripFenceOpeningPrefix(text).match(/^(`{3,}|~{3,})/);
+      const openingFence = parseFenceOpening(text);
       if (openingFence) {
-        fence = { marker: openingFence[1][0], length: openingFence[1].length };
+        fence = openingFence;
         fencedRanges.push([lineStart, separatorEnd]);
       }
     }
