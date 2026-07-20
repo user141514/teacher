@@ -197,6 +197,47 @@ test('方案重新生成成功后会清空旧反馈输入和结果', async ({ pa
   await expect(page.locator('#feedback-next-steps')).toHaveCount(0);
 });
 
+test('生成反馈期间返回方案页后，迟到响应不会恢复反馈页', async ({ page }) => {
+  await page.addInitScript(() => {
+    const nativeFetch = window.fetch.bind(window);
+    window.fetch = (input, init = {}) => {
+      const withoutSignal = { ...init };
+      delete withoutSignal.signal;
+      return nativeFetch(input, withoutSignal);
+    };
+  });
+  let releaseFeedback;
+  const delayedFeedback = new Promise((resolve) => { releaseFeedback = resolve; });
+  const fixtures = defaultFixtures();
+  fixtures.feedback = [() => delayedFeedback];
+  const requests = await advanceToPlan(page, fixtures);
+  await page.getByRole('button', { name: '去反馈' }).click();
+  await page.getByLabel('本次沟通后的情况').fill('等待生成的反馈');
+  await page.getByRole('button', { name: '生成下一步建议' }).click();
+  await expect.poll(() => requests.filter((item) => item.method === 'feedback').length).toBe(1);
+
+  await page.getByRole('button', { name: '返回上一步' }).click();
+  await expect(page.locator('.panel-h')).toHaveText('教练方案生成');
+  releaseFeedback(defaultFixtures().feedback[0]);
+  await page.waitForTimeout(150);
+
+  await expect(page.locator('.panel-h')).toHaveText('教练方案生成');
+  await expect(page.locator('#feedback-next-steps')).toHaveCount(0);
+});
+
+for (const width of [320, 375]) {
+  test(`${width}px 下返回上一步按钮可见且页面无横向溢出`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 700 });
+    await advanceToPlan(page);
+    await expect(page.getByRole('button', { name: '返回上一步' })).toBeVisible();
+    const viewport = await page.evaluate(() => ({
+      clientWidth: document.documentElement.clientWidth,
+      scrollWidth: document.documentElement.scrollWidth,
+    }));
+    expect(viewport.scrollWidth).toBe(viewport.clientWidth);
+  });
+}
+
 test('顶部返回首页后迟到请求不会恢复旧会话', async ({ page }) => {
   await page.addInitScript(() => {
     const nativeFetch = window.fetch.bind(window);

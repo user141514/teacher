@@ -53,6 +53,7 @@ const PREVIOUS_SCREEN = Object.freeze({
 function goPrevious() {
   const target = PREVIOUS_SCREEN[session.screen];
   if (!target) return;
+  cancelPendingRequests();
   if (session.screen === 'feedback') {
     const feedbackInput = document.getElementById('feedback-text');
     if (feedbackInput) setFeedbackText(feedbackInput.value);
