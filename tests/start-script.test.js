@@ -8,6 +8,7 @@ const test = require('node:test');
 
 const projectRoot = path.resolve(__dirname, '..');
 const sourceStartScript = path.join(projectRoot, 'scripts', 'start.ps1');
+const sourceBatchScript = path.join(projectRoot, 'start.bat');
 
 function createWorkspace(t, { withEnv = false, withNodeModules = false } = {}) {
   const root = mkdtempSync(path.join(os.tmpdir(), 'coach-start-script-'));
@@ -19,6 +20,9 @@ function createWorkspace(t, { withEnv = false, withNodeModules = false } = {}) {
     copyFileSync(sourceStartScript, path.join(scriptsDir, 'start.ps1'));
   } else {
     writeFileSync(path.join(scriptsDir, 'start.ps1'), 'exit 0\n', 'utf8');
+  }
+  if (existsSync(sourceBatchScript)) {
+    copyFileSync(sourceBatchScript, path.join(root, 'start.bat'));
   }
 
   if (withEnv) {
@@ -36,6 +40,19 @@ function runStartScript(root, args) {
   return spawnSync(
     'powershell',
     ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', 'scripts/start.ps1', ...args],
+    {
+      cwd: root,
+      encoding: 'utf8',
+      timeout: 10_000,
+      windowsHide: true,
+    },
+  );
+}
+
+function runBatchScript(root, args) {
+  return spawnSync(
+    'cmd.exe',
+    ['/d', '/c', 'start.bat', ...args],
     {
       cwd: root,
       encoding: 'utf8',
@@ -106,6 +123,15 @@ test('缺少 node_modules 时提示安装依赖', (t) => {
 test('CheckOnly 在前置条件满足时不启动服务', (t) => {
   const root = createWorkspace(t, { withEnv: true, withNodeModules: true });
   const result = runStartScript(root, ['-CheckOnly', '-NoBrowser']);
+
+  assert.equal(result.error, undefined);
+  assert.equal(result.status, 0);
+  assert.match(result.stdout, /环境检查通过/);
+});
+
+test('根目录批处理入口会转发参数并复用 PowerShell 启动脚本', (t) => {
+  const root = createWorkspace(t, { withEnv: true, withNodeModules: true });
+  const result = runBatchScript(root, ['-CheckOnly', '-NoBrowser']);
 
   assert.equal(result.error, undefined);
   assert.equal(result.status, 0);

@@ -39,6 +39,8 @@ npm.cmd install
 ./scripts/start.ps1
 ```
 
+完成首次配置后，也可以直接双击项目根目录的 `start.bat`。该入口会复用同一份 PowerShell 启动逻辑，并自动处理当前进程的执行策略。
+
 `./scripts/start.ps1` 会检查 Node.js、`.env` 和 `node_modules`，若服务已在运行则直接复用，否则在后台启动服务并打开浏览器。它不会安装依赖、创建 `.env` 或显示其中的内容。
 
 只在本机的 `.env` 中填写 `DEEPSEEK_API_KEY`；该文件已被 Git 忽略，不要提交或在文档中粘贴真实密钥。服务启动后访问 `http://127.0.0.1:4173/`。
