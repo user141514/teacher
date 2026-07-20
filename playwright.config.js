@@ -1,7 +1,4 @@
 const { defineConfig } = require('@playwright/test');
-const path = require('path');
-
-const frontendDir = path.join(__dirname, 'frontend');
 
 module.exports = defineConfig({
   testDir: './tests',
@@ -15,7 +12,11 @@ module.exports = defineConfig({
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: `python -m http.server 4173 --directory "${frontendDir}"`,
+    command: 'node server/index.js',
+    env: {
+      PORT: '4173',
+      DEEPSEEK_API_KEY: 'test-only',
+    },
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: false,
   },
