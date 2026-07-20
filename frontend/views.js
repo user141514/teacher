@@ -242,11 +242,17 @@ function parseMarkdownPrefix(value, requireFullMatch = false) {
   return { continuation: match[1] };
 }
 
+function isCoachingStageBoundary(markdown, matchIndex, line) {
+  if (parseMarkdownPrefix(markdown.slice(line.start, matchIndex), true)) return true;
+  const before = markdown.slice(0, matchIndex).replace(/[ \t]+$/, '');
+  return before.length === 0 || /[\r\n；;。]$/.test(before);
+}
+
 function formatCoachingStageMarkdown(source) {
   const markdown = normalizeMarkdownSource(source);
   const labels = COACHING_STAGE_LABELS.map(escapeRegExp).join('|');
   const stageLabel = new RegExp(
-    `(?:\\*\\*(?:${labels})(?:\\*\\*[ \\t]*[：:]|[ \\t]*[：:]\\*\\*)|(?:${labels})[ \\t]*[：:])`,
+    `(?:(\\*\\*|__)(?:${labels})(?:\\1[ \\t]*[：:]|[ \\t]*[：:]\\1)|(?:${labels})[ \\t]*[：:])`,
     'g',
   );
   const lineBreak = markdown.includes('\r\n') ? '\r\n' : '\n';
@@ -261,6 +267,7 @@ function formatCoachingStageMarkdown(source) {
     while (lineIndex + 1 < lines.length && matchIndex >= lines[lineIndex + 1].start) lineIndex += 1;
 
     const line = lines[lineIndex];
+    if (!isCoachingStageBoundary(markdown, matchIndex, line)) continue;
     const prefix = parseMarkdownPrefix(markdown.slice(line.start, matchIndex), true);
     if (prefix) {
       const priorLineIsBlank = lineIndex === 0 || lines[lineIndex - 1].text.trim().length === 0;

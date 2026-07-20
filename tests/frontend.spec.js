@@ -405,6 +405,59 @@ test('阶段格式化保护 Markdown 代码上下文中的跨行 code span', asy
     .toHaveText('Reality（现状）：未闭合后的真实现状。');
 });
 
+test('阶段格式化对齐服务端边界并支持下划线 strong 标签', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.plan = [envelope({
+    entry: ['普通切入点。'],
+    cautions: ['保持观察。'],
+    frequency: '每周一次',
+    gap_fix: ['保留普通修正建议。'],
+    scripts: ['__Goal（目标）__：目标内容。__Reality（现状）__：现状内容。__Options（可选方案）：__ 选项内容；__Will（行动承诺）__ :承诺内容。'],
+  })];
+  await advanceToPlan(page, fixtures);
+
+  const scripts = page.locator('#plan-scripts');
+  await expectStageLabelsInSeparateParagraphs(
+    scripts,
+    ['Goal（目标）', 'Reality（现状）', 'Options（可选方案）', 'Will（行动承诺）'],
+  );
+  await expect(scripts.locator('p')).toHaveCount(4);
+  await expect(scripts.locator('strong')).toHaveCount(4);
+  await expect(scripts.locator('p').nth(0)).toHaveText('Goal（目标）：目标内容。');
+  await expect(scripts.locator('p').nth(1)).toHaveText('Reality（现状）：现状内容。');
+  await expect(scripts.locator('p').nth(2)).toHaveText('Options（可选方案）： 选项内容；');
+  await expect(scripts.locator('p').nth(3)).toHaveText('Will（行动承诺） :承诺内容。');
+});
+
+test('阶段格式化对齐服务端边界且不拆分链接文本中的标签', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.plan = [envelope({
+    entry: ['普通切入点。'],
+    cautions: ['保持观察。'],
+    frequency: '每周一次',
+    gap_fix: ['参考 [Reality（现状）：说明](https://example.com)；Situation（情境）：真实情境。Behavior（行为）：真实行为；Impact（影响）：真实影响。'],
+    scripts: ['保留普通话术。'],
+  })];
+  await advanceToPlan(page, fixtures);
+
+  const gapFix = page.locator('#plan-gap-fix');
+  const reference = gapFix.getByRole('link', { name: 'Reality（现状）：说明' });
+  await expect(reference).toHaveCount(1);
+  await expect(reference).toHaveAttribute('href', /https:\/\/example\.com\/?/);
+  await expect(gapFix.locator('p').filter({ hasText: '参考 Reality（现状）：说明' }))
+    .toHaveText('参考 Reality（现状）：说明；');
+  await expectStageLabelsInSeparateParagraphs(
+    gapFix,
+    ['Situation（情境）', 'Behavior（行为）', 'Impact（影响）'],
+  );
+  await expect(gapFix.locator('p').filter({ hasText: '真实情境' }))
+    .toHaveText('Situation（情境）：真实情境。');
+  await expect(gapFix.locator('p').filter({ hasText: '真实行为' }))
+    .toHaveText('Behavior（行为）：真实行为；');
+  await expect(gapFix.locator('p').filter({ hasText: '真实影响' }))
+    .toHaveText('Impact（影响）：真实影响。');
+});
+
 test('类型结果和流程步骤使用非交互类型卡片与命名导航语义', async ({ page }) => {
   await advanceToClassification(page);
 
