@@ -35,7 +35,7 @@ async function fillHome(page) {
 }
 
 async function advanceToClassification(page, fixtures) {
-  await mockCoachApi(page, fixtures);
+  const requests = await mockCoachApi(page, fixtures);
   await page.goto('/');
   await fillHome(page);
   await page.getByRole('button', { name: '审查信息' }).click();
@@ -45,12 +45,14 @@ async function advanceToClassification(page, fixtures) {
   await expect(page.getByRole('button', { name: '生成类型判定' })).toBeEnabled();
   await page.getByRole('button', { name: '生成类型判定' }).click();
   await expect(page.locator('.panel-h')).toHaveText('类型判定');
+  return requests;
 }
 
 async function advanceToPlan(page, fixtures) {
-  await advanceToClassification(page, fixtures);
+  const requests = await advanceToClassification(page, fixtures);
   await page.getByRole('button', { name: '生成辅导方案' }).click();
   await expect(page.locator('.panel-h')).toHaveText('教练方案生成');
+  return requests;
 }
 
 async function mountMarkdownFixture(page, markdown) {
@@ -125,6 +127,33 @@ test('顶部返回首页会从方案页清空当前会话', async ({ page }) => 
   await expect(page.locator('#coach-plan')).toHaveCount(0);
   await expect(page.locator('[id^="type-card-"]')).toHaveCount(0);
   await expect(page.locator('#feedback-next-steps')).toHaveCount(0);
+});
+
+test('第 2、3、4 步可以逐步返回且返回操作不重复调用 API', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  const requests = await advanceToPlan(page, fixtures);
+  const requestCountBeforeReturn = requests.length;
+
+  await page.getByRole('button', { name: '返回上一步' }).click();
+  await expect(page.locator('.panel-h')).toHaveText('类型判定');
+  await expect(page.locator('#type-card-B')).toContainText('成熟待激活型');
+
+  await page.getByRole('button', { name: '返回上一步' }).click();
+  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('独立承接三个项目');
+  await expect(page.getByLabel('近期辅导困扰')).toHaveValue('交代的事不追就停');
+  await expect(page.getByRole('button', { name: '返回上一步' })).toHaveCount(0);
+  expect(requests).toHaveLength(requestCountBeforeReturn);
+});
+
+test('第 4 步返回方案后会保留尚未提交的反馈草稿', async ({ page }) => {
+  await advanceToPlan(page);
+  await page.getByRole('button', { name: '去反馈' }).click();
+  await page.getByLabel('本次沟通后的情况').fill('已提交的反馈草稿');
+  await page.getByRole('button', { name: '返回上一步' }).click();
+  await expect(page.locator('.panel-h')).toHaveText('教练方案生成');
+  await page.getByRole('button', { name: '去反馈' }).click();
+  await expect(page.getByLabel('本次沟通后的情况')).toHaveValue('已提交的反馈草稿');
 });
 
 test('顶部返回首页后迟到请求不会恢复旧会话', async ({ page }) => {

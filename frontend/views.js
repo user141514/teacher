@@ -33,6 +33,10 @@ function button(id, text, onClick, { accent = false, secondary = false, disabled
   return control;
 }
 
+function appendPreviousButton(footer, handlers) {
+  footer.append(button('go-previous', '返回上一步', handlers.goPrevious, { secondary: true }));
+}
+
 function fieldLabel(forId, text, hint) {
   const label = node('label', { className: 'flabel', text, htmlFor: forId });
   if (hint) label.append(node('span', { className: 'dim', text: hint }));
@@ -358,7 +362,10 @@ function renderHome(root, state, handlers) {
     textAreaField('home-traits', '员工特征补充', state.intake.traits, '补充可观察到的能力、意愿或行为证据'),
   );
   appendError(card, state.error);
-  const submit = button('review-intake', state.busy ? '正在审查…' : '审查信息', () => {
+  const submitLabel = state.intakeResult && state.intakeResult.sufficient
+    ? '继续类型判定'
+    : state.busy ? '正在审查…' : '审查信息';
+  const submit = button('review-intake', submitLabel, () => {
     handlers.reviewIntake({
       role: document.getElementById('home-role').value,
       tenure: document.getElementById('home-tenure').value,
@@ -403,6 +410,7 @@ function renderClassification(root, state, handlers) {
     body.append(node('div', { className: 'note', text: '信息已完整。请生成类型判定。' }));
     appendError(body, state.error);
     const footer = node('div', { className: 'panel-foot' });
+    appendPreviousButton(footer, handlers);
     footer.append(button('generate-classification', state.busy ? '正在生成…' : '生成类型判定', handlers.generateClassification, { accent: true, disabled: state.busy }));
     panel.append(footer);
     root.replaceChildren(fragment);
@@ -449,8 +457,13 @@ function renderClassification(root, state, handlers) {
   appendError(body, state.error);
 
   const footer = node('div', { className: 'panel-foot' });
+  appendPreviousButton(footer, handlers);
   if (classification.status === '已判定') {
-    footer.append(button('generate-plan', state.busy ? '正在生成…' : '生成辅导方案', handlers.generatePlan, { accent: true, disabled: state.busy }));
+    const label = state.plan ? '继续查看方案' : (state.busy ? '正在生成…' : '生成辅导方案');
+    footer.append(button('generate-plan', label, handlers.generatePlan, {
+      accent: true,
+      disabled: state.busy,
+    }));
   } else if (classification.status === '待人工确认') {
     footer.append(button('manual-confirmation', '人工确认', handlers.goHome, { secondary: true }));
   } else {
@@ -473,6 +486,7 @@ function renderPlan(root, state, handlers) {
   body.append(report);
   appendError(body, state.error);
   const footer = node('div', { className: 'panel-foot' });
+  appendPreviousButton(footer, handlers);
   footer.append(
     button('copy-plan', '复制方案', handlers.copyPlan, { secondary: true }),
     button('regenerate-plan', state.busy ? '正在生成…' : '换个角度', handlers.regeneratePlan, { secondary: true, disabled: state.busy }),
@@ -496,6 +510,7 @@ function renderFeedback(root, state, handlers) {
     body.append(node('div', { id: 'followout' }));
   }
   const footer = node('div', { className: 'panel-foot' });
+  appendPreviousButton(footer, handlers);
   footer.append(button('generate-feedback', state.busy ? '正在生成…' : '生成下一步建议', () => {
     handlers.generateFeedback(document.getElementById('feedback-text').value.trim());
   }, { accent: true, disabled: state.busy }));

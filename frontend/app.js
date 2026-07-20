@@ -41,6 +41,26 @@ function returnHome() {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
+const PREVIOUS_SCREEN = Object.freeze({
+  classification: ['home', 1],
+  plan: ['classification', 2],
+  feedback: ['plan', 3],
+});
+
+function goPrevious() {
+  const target = PREVIOUS_SCREEN[session.screen];
+  if (!target) return;
+  if (session.screen === 'feedback') {
+    const feedbackInput = document.getElementById('feedback-text');
+    if (feedbackInput) setFeedbackText(feedbackInput.value);
+  }
+  setBusy(false);
+  setError(null);
+  setScreen(target[0], target[1]);
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
 function answersPayload() {
   return Object.fromEntries(session.answers.map(({ question, answer }) => [question, answer]));
 }
@@ -206,6 +226,7 @@ const handlers = {
     render();
   },
   continueSupplement,
+  goPrevious,
   goHome: returnHome,
 };
 
