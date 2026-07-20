@@ -63,6 +63,18 @@ async function mountMarkdownFixture(page, markdown) {
   }, markdown);
 }
 
+async function expectStageLabelsInSeparateParagraphs(container, labels) {
+  await expect(container.locator('p').first()).toBeVisible();
+  const paragraphTexts = await container.locator('p').allTextContents();
+  for (const label of labels) {
+    const matchingParagraphs = paragraphTexts.filter((text) => text.includes(label));
+    expect(matchingParagraphs).toHaveLength(1);
+    for (const otherLabel of labels.filter((candidate) => candidate !== label)) {
+      expect(matchingParagraphs[0]).not.toContain(otherLabel);
+    }
+  }
+}
+
 test('页面和健康检查由同一服务提供', async ({ page, request }) => {
   const health = await request.get('/api/health');
 
@@ -236,6 +248,21 @@ test('方案页可见完整 GROW 与 B 类型的 SBI 标签', async ({ page }) =
   for (const label of ['Situation（情境）', 'Behavior（行为）', 'Impact（影响）']) {
     await expect(page.locator('#coach-plan')).toContainText(label);
   }
+});
+
+test('GROW 和 SBI 的每个阶段分别显示为独立段落', async ({ page }) => {
+  const growLabels = ['Goal（目标）', 'Reality（现状）', 'Options（可选方案）', 'Will（行动承诺）'];
+  const sbiLabels = ['Situation（情境）', 'Behavior（行为）', 'Impact（影响）'];
+  await advanceToPlan(page);
+
+  await expectStageLabelsInSeparateParagraphs(page.locator('#plan-scripts'), growLabels);
+  await expectStageLabelsInSeparateParagraphs(page.locator('#plan-gap-fix'), sbiLabels);
+
+  await page.getByRole('button', { name: '去反馈' }).click();
+  await page.getByLabel('本次沟通后的情况').fill('员工本周主动同步了项目风险，并按约定提交了里程碑。');
+  await page.getByRole('button', { name: '生成下一步建议' }).click();
+
+  await expectStageLabelsInSeparateParagraphs(page.locator('#feedback-next-steps'), sbiLabels);
 });
 
 test('类型结果和流程步骤使用非交互类型卡片与命名导航语义', async ({ page }) => {

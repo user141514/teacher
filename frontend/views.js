@@ -110,11 +110,50 @@ function createWorkspace(state, title, description) {
   return { fragment, body, panel };
 }
 
-function markdownCard(parent, id, title, source) {
+const COACHING_STAGE_LABELS = [
+  'Goal（目标）',
+  'Reality（现状）',
+  'Options（可选方案）',
+  'Will（行动承诺）',
+  'Situation（情境）',
+  'Behavior（行为）',
+  'Impact（影响）',
+];
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function normalizeMarkdownSource(source) {
+  return Array.isArray(source) ? source.join('\n') : source || '';
+}
+
+function formatCoachingStageMarkdown(source) {
+  const markdown = normalizeMarkdownSource(source);
+  const labels = COACHING_STAGE_LABELS.map(escapeRegExp).join('|');
+  const stageLabel = new RegExp(
+    `(?:\\*\\*(?:${labels})(?:\\*\\*[：:]|[：:]\\*\\*)|(?:${labels})[：:])`,
+    'g',
+  );
+  const lineBreak = markdown.includes('\r\n') ? '\r\n' : '\n';
+
+  return markdown.replace(stageLabel, (match, offset) => {
+    const before = markdown.slice(0, offset);
+    if (before.trim().length === 0 || /\r?\n[ \t]*\r?\n[ \t]*$/.test(before)) return match;
+    if (/\r?\n[ \t]*$/.test(before)) return `${lineBreak}${match}`;
+    return `${lineBreak}${lineBreak}${match}`;
+  });
+}
+
+function markdownCard(parent, id, title, source, options = {}) {
   const card = node('section', { className: 'rcard' });
   card.append(node('h3', { className: 'rcard-h', text: title }));
   const content = node('div', { id });
-  window.renderMarkdown(content, Array.isArray(source) ? source.join('\n') : source || '');
+  const markdown = normalizeMarkdownSource(source);
+  window.renderMarkdown(
+    content,
+    options.separateCoachingStages ? formatCoachingStageMarkdown(markdown) : markdown,
+  );
   card.append(content);
   parent.append(card);
 }
@@ -251,8 +290,8 @@ function renderPlan(root, state, handlers) {
   const frequency = node('section', { className: 'rcard' });
   frequency.append(node('h3', { className: 'rcard-h', text: '建议沟通频率' }), node('p', { id: 'plan-frequency', text: state.plan.frequency || '' }));
   report.append(frequency);
-  markdownCard(report, 'plan-gap-fix', '绩效差距修正方法', state.plan.gap_fix);
-  markdownCard(report, 'plan-scripts', '话术示例', state.plan.scripts);
+  markdownCard(report, 'plan-gap-fix', '绩效差距修正方法', state.plan.gap_fix, { separateCoachingStages: true });
+  markdownCard(report, 'plan-scripts', '话术示例', state.plan.scripts, { separateCoachingStages: true });
   body.append(report);
   appendError(body, state.error);
   const footer = node('div', { className: 'panel-foot' });
@@ -272,7 +311,7 @@ function renderFeedback(root, state, handlers) {
   if (state.feedback) {
     const output = node('div', { className: 'report', id: 'followout' });
     markdownCard(output, 'feedback-progress', '进展解读', state.feedback.progress_read);
-    markdownCard(output, 'feedback-next-steps', '下一步建议', state.feedback.next_steps);
+    markdownCard(output, 'feedback-next-steps', '下一步建议', state.feedback.next_steps, { separateCoachingStages: true });
     markdownCard(output, 'feedback-watch-points', '观察要点', state.feedback.watch_points);
     body.append(output);
   } else {
