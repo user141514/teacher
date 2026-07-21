@@ -26,6 +26,18 @@ async function mockCoachApi(page, fixtures = defaultFixtures()) {
   return requests;
 }
 
+function deferredFixture(response) {
+  let release;
+  const gate = new Promise((resolve) => { release = resolve; });
+  return {
+    handler: async () => {
+      await gate;
+      return response;
+    },
+    release,
+  };
+}
+
 async function openIntake(page) {
   await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' }))
     .toBeVisible();
@@ -197,6 +209,49 @@ test('加载动作有固定枚举且结束 busy 时会清空当前动作', async
     active: { busy: true, action: 'plan-regenerate', remaining: 150 },
     finished: { busy: false, action: null },
   });
+});
+
+test('员工信息审查期间显示可访问的内容面板加载层', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  const delayed = deferredFixture(fixtures.intake[0]);
+  fixtures.intake[0] = delayed.handler;
+  await mockCoachApi(page, fixtures);
+  await page.goto('/');
+  await fillHome(page);
+
+  await page.getByRole('button', { name: '判定类型' }).click();
+  const overlay = page.locator('.loading-overlay');
+  await expect(overlay).toBeVisible();
+  await expect(overlay).toHaveAttribute('role', 'status');
+  await expect(page.locator('.panel-body')).toHaveAttribute('aria-busy', 'true');
+  await expect(overlay.getByText('正在审查员工信息')).toBeVisible();
+  await expect(page.locator('#workspace-return-home')).toBeEnabled();
+
+  delayed.release();
+  await expect(overlay).toHaveCount(0);
+  await expect(page.locator('.panel-body')).toHaveAttribute('aria-busy', 'false');
+});
+
+test('类型判定期间显示匹配画像文案且返回上一步会取消加载', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  const delayed = deferredFixture(fixtures.classify[0]);
+  fixtures.classify[0] = delayed.handler;
+  await mockCoachApi(page, fixtures);
+  await page.goto('/');
+  await fillHome(page);
+  await page.getByRole('button', { name: '判定类型' }).click();
+  await page.getByLabel('追问 1').fill('尚未做过。');
+  await page.getByRole('button', { name: '再次审查' }).click();
+  await page.getByRole('button', { name: '生成类型判定' }).click();
+
+  await expect(page.getByText('正在匹配员工画像')).toBeVisible();
+  await page.getByRole('button', { name: '返回上一步' }).click();
+  await expect(page.locator('.panel-h')).toHaveText('员工信息输入');
+  await expect(page.locator('.loading-overlay')).toHaveCount(0);
+
+  delayed.release();
+  await page.waitForTimeout(350);
+  await expect(page.locator('.panel-h')).toHaveText('员工信息输入');
 });
 
 test('桌面员工输入页对齐参考结构并把可访问关键词真实提交到 intake', async ({ page }) => {

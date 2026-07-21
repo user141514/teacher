@@ -30,6 +30,7 @@ import {
 } from './api.js';
 import { renderApp } from './views.js';
 import { publicProfileId, resolveFinalClassification } from './profile-selection.js';
+import { BUSY_ACTIONS, waitForMinimumLoading } from './loading.js';
 
 const root = document.getElementById('app');
 const toastElement = document.getElementById('toast');
@@ -89,6 +90,15 @@ function planSummary() {
   ].join('\n');
 }
 
+async function requestWithLoading(action, request) {
+  const startedAt = performance.now();
+  setBusy(true, action);
+  render();
+  const result = await request();
+  await waitForMinimumLoading(startedAt);
+  return result;
+}
+
 function consume(result) {
   if (result.stale || !isCurrentEpoch(result.requestEpoch)) return null;
   setBusy(false);
@@ -126,9 +136,10 @@ async function reviewIntake(values, answers = session.answers) {
   }
   clearDownstream('intake');
   setError(null);
-  setBusy(true);
-  render();
-  const result = await intake(payload);
+  const result = await requestWithLoading(
+    BUSY_ACTIONS.INTAKE_REVIEW,
+    () => intake(payload),
+  );
   const data = consume(result);
   if (!data) return;
   if (data.high_risk_personnel_action || data.status === '高风险停止') {
@@ -158,9 +169,10 @@ async function generateClassification() {
     clearDownstream('classification');
   }
   setError(null);
-  setBusy(true);
-  render();
-  const result = await classify(payload);
+  const result = await requestWithLoading(
+    BUSY_ACTIONS.CLASSIFICATION_GENERATE,
+    () => classify(payload),
+  );
   const data = consume(result);
   if (!data) return;
   markSubmission('classification', payload);

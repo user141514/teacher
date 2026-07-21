@@ -18,6 +18,29 @@ const TRAIT_KEYWORDS = [
   '责任心强', '经验不足', '追求稳定', '有上进心', '需要认可',
 ];
 
+const LOADING_CONTENT = Object.freeze({
+  'intake-review': {
+    title: '正在审查员工信息',
+    items: ['检查资料完整性', '提取能力与意愿证据', '整理需要补充的问题'],
+  },
+  'classification-generate': {
+    title: '正在匹配员工画像',
+    items: ['分析能力与意愿证据', '匹配最接近的员工画像', '整理判断依据'],
+  },
+  'plan-generate': {
+    title: '正在生成教练方案',
+    items: ['读取最终确认画像', '组织 GROW/SBI 建议', '生成沟通方案'],
+  },
+  'plan-regenerate': {
+    title: '正在重新生成方案',
+    items: ['保留最终确认画像', '避开上一版角度', '生成新的沟通方案'],
+  },
+  'feedback-generate': {
+    title: '正在生成下一步建议',
+    items: ['分析本次沟通反馈', '识别进展与风险', '整理下一步行动'],
+  },
+});
+
 export const BLOCKED_MESSAGE = '该事项涉及高风险人事决策，请转交 HR 按公司制度处理。本工具仅可协助准备一般辅导沟通。';
 
 function node(tag, { className, id, text, type, disabled, value, htmlFor } = {}) {
@@ -425,6 +448,34 @@ function renderHome(root, state, handlers) {
   root.replaceChildren(section);
 }
 
+function createLoadingOverlay(action) {
+  const content = LOADING_CONTENT[action];
+  if (!content) return null;
+  const overlay = node('div', { className: 'loading-overlay' });
+  overlay.setAttribute('role', 'status');
+  overlay.setAttribute('aria-live', 'polite');
+  overlay.append(
+    node('div', { className: 'loading-spinner' }),
+    node('div', { className: 'loading-title', text: content.title }),
+    node('div', { className: 'loading-subtitle', text: '正在处理，请稍候…' }),
+  );
+  const list = node('ul', { className: 'loading-items' });
+  for (const item of content.items) list.append(node('li', { text: item }));
+  overlay.append(list);
+  return overlay;
+}
+
+function applyLoadingPresentation(root, state) {
+  const body = root.querySelector('.panel-body');
+  if (!body) return;
+  body.setAttribute('aria-busy', String(state.busy));
+  if (!state.busy) return;
+  const overlay = createLoadingOverlay(state.busyAction);
+  if (!overlay) return;
+  for (const child of body.children) child.inert = true;
+  body.append(overlay);
+}
+
 function intakeGroupTitle(number, title, hint, tone = 'pill-y') {
   const heading = node('div', { className: 'flabel intake-section-title' });
   heading.append(
@@ -804,10 +855,11 @@ function renderBlocked(root, handlers) {
 }
 
 export function renderApp(root, state, handlers) {
-  if (state.screen === 'home') return renderHome(root, state, handlers);
-  if (state.screen === 'intake') return renderIntake(root, state, handlers);
-  if (state.screen === 'classification') return renderClassification(root, state, handlers);
-  if (state.screen === 'plan') return renderPlan(root, state, handlers);
-  if (state.screen === 'feedback') return renderFeedback(root, state, handlers);
-  return renderBlocked(root, handlers);
+  if (state.screen === 'home') renderHome(root, state, handlers);
+  else if (state.screen === 'intake') renderIntake(root, state, handlers);
+  else if (state.screen === 'classification') renderClassification(root, state, handlers);
+  else if (state.screen === 'plan') renderPlan(root, state, handlers);
+  else if (state.screen === 'feedback') renderFeedback(root, state, handlers);
+  else renderBlocked(root, handlers);
+  applyLoadingPresentation(root, state);
 }
