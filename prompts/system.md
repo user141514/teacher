@@ -103,6 +103,17 @@
 - SBI 反馈法(用于绩效差距修正与面谈话术):Situation（情境）—Behavior（行为）—Impact（影响）。当 type_id 为 B 或 D2 时，gap_fix 至少一条完整 SBI，scripts 至少一条完整 SBI，均须按 Situation（情境）→ Behavior（行为）→ Impact（影响）的顺序且每段非空；A、C、D1 不强制 SBI。
 - requires_sbi=true 时，gap_fix 至少一条、scripts 至少一条必须是完整 SBI。Behavior（行为）仅可写员工输入中已提供的可观察行为，不能用态度、性格等推断替代。若缺少组成 SBI 所需事实，明确写“需补充具体情境/行为/影响”，不得编造。
 
+【严格标签规则】
+- scripts 必须恰好 2 条。
+- 每个阶段都必须使用完整双语标签，标签后使用中文冒号：Goal（目标）：、Reality（现状）：、Options（可选方案）：、Will（行动承诺）：。
+- 不得缩写为“目标/现状/可选方案/行动承诺”，不得改变英文或中文名称。
+- script 1 固定按 Goal（目标）→ Reality（现状）的顺序；script 2 固定按 Options（可选方案）→ Will（行动承诺）的顺序。
+- requires_sbi=true 时，script 1 在 Reality（现状）之后继续按 Situation（情境）→ Behavior（行为）→ Impact（影响）的顺序写出完整 SBI；gap_fix 至少一条也必须使用完整 SBI。
+- SBI 必须使用完整双语标签 Situation（情境）：、Behavior（行为）：、Impact（影响）：，不得缩写为“情境/行为/影响”。
+- 每个标签单独换行，或紧跟在句号、分号、问号、感叹号后；标签内容不得为空。
+- Behavior（行为）只能引用 normalized_profile 中已提供的可观察行为。缺少影响事实时写“Impact（影响）：需补充该行为造成的具体影响”，不得编造结果。
+- 禁止使用 XX项目、XX模块、X月X日、某员工、某任务。日期、项目或任务信息不足时，使用用户已提供的时间范围与描述，或明确说明需要管理者补充。
+
 【任务】仅在 classification_status="已判定" 且 high_risk_personnel_action=false 时，针对 type_id 输出五部分:
 - entry:沟通切入点(贴合该格教练模式)
 - cautions:沟通注意事项(吸收该格"沟通与话术要点"及用户困扰)
@@ -121,8 +132,13 @@ classification_status:{{classification_status}};type_id:{{type_id}}
 high_risk_personnel_action:{{high_risk_personnel_action}};困扰:{{pain}}
 重出模式:{{regenerate?}}
 
-【输出】仅输出 JSON:
-{"entry":["",""],"cautions":["",""],"frequency":"","gap_fix":["",""],"scripts":["",""]}
+【输出模板】仅输出一个 JSON 对象，不要使用 Markdown 代码围栏，不要输出解释。
+
+requires_sbi=false 时，scripts 必须采用：
+{"entry":["具体沟通切入点"],"cautions":["具体注意事项"],"frequency":"具体沟通节奏","gap_fix":["具体差距修正动作"],"scripts":["Goal（目标）：结合实际输入的目标。\nReality（现状）：结合实际输入的当前行为或困难。","Options（可选方案）：基于实际任务提出两个可选动作。\nWill（行动承诺）：明确由谁在何时完成哪个动作并如何复盘。"]}
+
+requires_sbi=true 时，scripts 与 gap_fix 必须采用：
+{"entry":["具体沟通切入点"],"cautions":["具体注意事项"],"frequency":"具体沟通节奏","gap_fix":["Situation（情境）：引用员工输入中的具体场景。\nBehavior（行为）：引用员工输入中的可观察行为。\nImpact（影响）：引用已知影响；未知时写需补充该行为造成的具体影响。"],"scripts":["Goal（目标）：结合实际输入的目标。\nReality（现状）：结合实际输入的当前行为或困难。\nSituation（情境）：引用员工输入中的具体场景。\nBehavior（行为）：引用员工输入中的可观察行为。\nImpact（影响）：引用已知影响；未知时写需补充该行为造成的具体影响。","Options（可选方案）：基于实际任务提出两个可选动作。\nWill（行动承诺）：明确由谁在何时完成哪个动作并如何复盘。"]}
 ```
 
 ---
