@@ -149,6 +149,18 @@ function runBatchScript(root, args) {
   );
 }
 
+function spawnBatchScript(root, args) {
+  return spawn(
+    'cmd.exe',
+    ['/d', '/c', 'start.bat', ...args],
+    {
+      cwd: root,
+      stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
+    },
+  );
+}
+
 function waitForHealthServer(child) {
   return new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('health server did not start')), 5_000);
@@ -246,4 +258,36 @@ test('端口已被占用时安全退出且不终止原服务', async (t) => {
   assert.match(result.stdout, /端口.*已被占用.*未启动服务/);
   assert.equal(child.exitCode, null);
   assert.equal(await isHealthy(port), true);
+});
+
+test('start.bat 在服务运行时占用终端且关闭后释放本次端口', async (t) => {
+  const port = await getAvailablePort();
+  const root = createWorkspace(t, {
+    withEnv: true,
+    withNodeModules: true,
+    withServer: true,
+    port,
+  });
+  let launcher;
+
+  try {
+    launcher = spawnBatchScript(root, ['-NoBrowser']);
+    await waitFor(() => isHealthy(port), 'fixture service did not become healthy');
+
+    assert.equal(launcher.exitCode, null);
+
+    stopProcessTree(launcher.pid);
+    await waitFor(() => launcher.exitCode !== null, 'startup terminal did not exit');
+    await waitFor(async () => !(await isHealthy(port)), 'service port was not released');
+
+    const probe = http.createServer();
+    await new Promise((resolve, reject) => {
+      probe.once('error', reject);
+      probe.listen(port, '127.0.0.1', resolve);
+    });
+    await new Promise((resolve) => probe.close(resolve));
+  } finally {
+    if (launcher && launcher.exitCode === null) stopProcessTree(launcher.pid);
+    stopRecordedService(root);
+  }
 });

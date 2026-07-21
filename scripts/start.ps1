@@ -86,26 +86,46 @@ try {
     exit 0
   }
 
+  $serviceProcess = $null
   try {
-    $process = Start-Process -FilePath $nodeCommand.Source -ArgumentList @('--env-file=.env', 'server/index.js') -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
-  } catch {
-    Stop-WithMessage '服务启动失败。请检查 Node.js 安装和项目依赖后重试。'
-  }
-
-  $deadline = (Get-Date).AddSeconds(20)
-  while ((Get-Date) -lt $deadline) {
-    Start-Sleep -Milliseconds 500
-    if (Test-HealthyService) {
-      Write-Output '服务已启动。'
-      Open-ServiceInBrowser
-      exit 0
+    try {
+      $serviceProcess = Start-Process `
+        -FilePath $nodeCommand.Source `
+        -ArgumentList @('--env-file=.env', 'server/index.js') `
+        -WorkingDirectory $projectRoot `
+        -NoNewWindow `
+        -PassThru
+    } catch {
+      Stop-WithMessage '服务启动失败。请检查 Node.js 安装和项目依赖后重试。'
     }
-    if ($process.HasExited) {
-      break
+
+    $deadline = (Get-Date).AddSeconds(20)
+    $healthy = $false
+    while ((Get-Date) -lt $deadline) {
+      Start-Sleep -Milliseconds 500
+      if (Test-HealthyService) {
+        $healthy = $true
+        break
+      }
+      if ($serviceProcess.HasExited) {
+        break
+      }
+    }
+
+    if (-not $healthy) {
+      Stop-WithMessage '服务启动失败，20 秒内未通过健康检查。请检查终端输出后重试。'
+    }
+
+    Write-Output "服务已启动：$serviceUrl"
+    Open-ServiceInBrowser
+    $serviceProcess.WaitForExit()
+    exit $serviceProcess.ExitCode
+  } finally {
+    if ($serviceProcess -and -not $serviceProcess.HasExited) {
+      Stop-Process -Id $serviceProcess.Id -Force -ErrorAction SilentlyContinue
+      [void]$serviceProcess.WaitForExit(5000)
     }
   }
-
-  Stop-WithMessage '服务启动失败，20 秒内未通过健康检查。请检查终端输出后重试。'
 } finally {
   Pop-Location
 }
