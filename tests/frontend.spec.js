@@ -200,6 +200,95 @@ test('画像卡支持键盘改选并保持单选语义', async ({ page }) => {
   await expect(group.getByRole('radio', { name: /核心明星型/ })).toHaveAttribute('aria-checked', 'true');
 });
 
+test('生成方案使用用户最终选择的画像契约', async ({ page }) => {
+  const requests = await advanceToClassification(page);
+  await page.locator('[data-profile-id="A"]').click();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+
+  const planRequest = requests.find(({ method }) => method === 'plan');
+  expect(planRequest.body.classification).toMatchObject({
+    type_id: 'A',
+    quadrant: 'A',
+    ability: '高',
+    will: '高',
+    strategy: '委以重任',
+    coach_mode: '授权式',
+  });
+});
+
+test('非新人从其他画像改选待改进型时隐藏映射为 D2', async ({ page }) => {
+  const requests = await advanceToClassification(page);
+  await page.locator('[data-profile-id="D"]').click();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  expect(requests.find(({ method }) => method === 'plan').body.classification).toMatchObject({
+    type_id: 'D2',
+    quadrant: 'D',
+    strategy: '绩效改进/优化',
+    coach_mode: '绩效面谈',
+  });
+});
+
+test('新人从其他画像改选待改进型时隐藏映射为 D1', async ({ page }) => {
+  const requests = await mockCoachApi(page);
+  await page.goto('/');
+  await openIntake(page);
+  await page.getByLabel('岗位类别').selectOption({ label: '骨干/带教岗' });
+  await page.getByLabel('在团队入职时长').selectOption({ label: '3 个月内（新人）' });
+  await page.getByLabel('当前绩效状态').selectOption({ label: '持续达标' });
+  await page.getByLabel('绩效目标 / 上层期望').fill('独立承接三个项目');
+  await page.getByLabel('近期辅导困扰').fill('交代的事不追就停');
+  await page.getByLabel('员工特征补充').fill('能够独立交付复杂任务，但近期主动性不足。');
+  await page.getByRole('button', { name: '审查信息' }).click();
+  await page.getByLabel('追问 1').fill('尚未做过。');
+  await page.getByRole('button', { name: '再次审查' }).click();
+  await page.getByRole('button', { name: '生成类型判定' }).click();
+  await page.locator('[data-profile-id="D"]').click();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  expect(requests.find(({ method }) => method === 'plan').body.classification.type_id).toBe('D1');
+});
+
+test('AI 原为 D1 或 D2 时选择待改进型保留原隐藏子类型', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.classify = [classifiedAs('D1')];
+  const requests = await advanceToClassification(page, fixtures);
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  expect(requests.find(({ method }) => method === 'plan').body.classification.type_id).toBe('D1');
+});
+
+test('反馈请求继续使用与方案相同的最终画像', async ({ page }) => {
+  const requests = await advanceToClassification(page);
+  await page.locator('[data-profile-id="A"]').click();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  await page.getByRole('button', { name: '去反馈' }).click();
+  await page.getByLabel('本次沟通后的情况').fill('已完成首次沟通。');
+  await page.getByRole('button', { name: '生成下一步建议' }).click();
+  expect(requests.find(({ method }) => method === 'feedback').body.classification.type_id).toBe('A');
+});
+
+test('换个角度继续使用用户最终选择的画像', async ({ page }) => {
+  const requests = await advanceToClassification(page);
+  await page.locator('[data-profile-id="A"]').click();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  await page.getByRole('button', { name: '换个角度' }).click();
+
+  const planRequests = requests.filter(({ method }) => method === 'plan');
+  expect(planRequests).toHaveLength(2);
+  expect(planRequests.map(({ body }) => body.classification.type_id)).toEqual(['A', 'A']);
+});
+
+test('返回类型页改选画像后清除旧方案和反馈并重新请求方案', async ({ page }) => {
+  const fixtures = defaultFixtures();
+  fixtures.plan = [coachingPlan(), nextPlan()];
+  const requests = await advanceToPlan(page, fixtures);
+  await page.getByRole('button', { name: '返回上一步' }).click();
+  await page.locator('[data-profile-id="A"]').click();
+  await expect(page.getByRole('button', { name: '生成辅导方案' })).toBeVisible();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+
+  expect(requests.filter(({ method }) => method === 'plan')).toHaveLength(2);
+  expect(requests.filter(({ method }) => method === 'plan')[1].body.classification.type_id).toBe('A');
+});
+
 for (const width of [390, 768, 1440]) {
   test(`${width}px 下五页布局没有整页横向溢出`, async ({ page }) => {
     await page.setViewportSize({ width, height: 900 });

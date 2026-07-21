@@ -27,7 +27,7 @@ import {
   submitFeedback,
 } from './api.js';
 import { renderApp } from './views.js';
-import { publicProfileId } from './profile-selection.js';
+import { publicProfileId, resolveFinalClassification } from './profile-selection.js';
 
 const root = document.getElementById('app');
 const toastElement = document.getElementById('toast');
@@ -177,10 +177,18 @@ function selectProfile(profileId) {
   render();
 }
 
+function finalClassification() {
+  return resolveFinalClassification(
+    session.classification,
+    session.selectedProfileId || publicProfileId(session.classification?.type_id),
+    session.intake,
+  );
+}
+
 async function requestPlan(regenerate) {
   if (!session.classification || session.classification.status !== '已判定') return;
   const planInput = {
-    classification: session.classification,
+    classification: finalClassification(),
     normalizedProfile: session.intakeResult && session.intakeResult.normalized_profile,
     pain: session.intake.pain || '',
   };
@@ -213,7 +221,7 @@ async function generateFeedback(feedbackText) {
   setBusy(true);
   render();
   const result = await submitFeedback({
-    classification: session.classification,
+    classification: finalClassification(),
     planSummary: planSummary(),
     feedbackText,
   });
