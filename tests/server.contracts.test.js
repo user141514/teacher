@@ -2,6 +2,9 @@ const assert = require('node:assert/strict');
 const test = require('node:test');
 
 const {
+  PLAN_VALIDATION_CODES,
+  findPlanValidationIssues,
+  validateNormalizedProfile,
   validateIntake,
   validateModelClassification,
   validateClassification,
@@ -349,6 +352,93 @@ test('B 与 D2 方案同时要求 gap_fix 和 scripts 至少一项完整 SBI', (
     'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。',
     valid.scripts[1],
   ] }, { typeId: 'C' }), true);
+});
+
+test('方案诊断报告真实响应形态中的 B 类型双 SBI 与占位内容问题', () => {
+  const invalid = {
+    entry: ['从XX项目切入。'],
+    cautions: ['聚焦行为。'],
+    frequency: 'X月X日复盘。',
+    gap_fix: ['情境：周一例会。行为：未同步风险。影响：团队临时调整。'],
+    scripts: [
+      'Goal（目标）：完成XX模块。Reality（现状）：目前仍需主管提醒。',
+      'Options（可选方案）：你还想到哪些方式？Will（行动承诺）：X月X日前执行。',
+    ],
+  };
+
+  assert.deepEqual(findPlanValidationIssues(invalid, { typeId: 'B' }), [
+    PLAN_VALIDATION_CODES.MISSING_GAP_FIX_SBI,
+    PLAN_VALIDATION_CODES.MISSING_SCRIPT_SBI,
+    PLAN_VALIDATION_CODES.PLACEHOLDER_CONTENT,
+  ]);
+  assert.equal(validatePlan(invalid, { typeId: 'B' }), false);
+});
+
+test('方案诊断单独报告确实缺失的 GROW 阶段', () => {
+  const invalid = {
+    entry: ['从本周协作目标切入。'],
+    cautions: ['聚焦行为。'],
+    frequency: '本周五复盘一次。',
+    gap_fix: ['把主动同步拆成可观察的小步骤。'],
+    scripts: [
+      'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前仍需主管提醒。',
+      'Options（可选方案）：列出两个可选动作。',
+    ],
+  };
+
+  assert.deepEqual(findPlanValidationIssues(invalid, { typeId: 'A' }), [
+    PLAN_VALIDATION_CODES.INVALID_GROW,
+  ]);
+});
+
+test('严格有效方案没有诊断问题，事实不足说明不被误判为占位内容', () => {
+  const valid = {
+    entry: ['从本周主动同步目标切入。'],
+    cautions: ['只讨论已提供的可观察行为。'],
+    frequency: '本周五复盘一次。',
+    gap_fix: [
+      'Situation（情境）：周一项目例会。Behavior（行为）：你没有在会前同步风险。Impact（影响）：需补充该行为造成的具体影响。',
+    ],
+    scripts: [
+      'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。Situation（情境）：上周评审。Behavior（行为）：你没有提前同步风险。Impact（影响）：需补充该行为造成的具体影响。',
+      'Options（可选方案）：可在例会前或里程碑当天同步。Will（行动承诺）：周五前完成首次主动同步。',
+    ],
+  };
+
+  assert.deepEqual(findPlanValidationIssues(valid, { typeId: 'B' }), []);
+  assert.equal(validatePlan(valid, { typeId: 'B' }), true);
+
+  const nonSbiPlan = {
+    ...valid,
+    gap_fix: ['把主动同步拆成可观察的小步骤。'],
+    scripts: [
+      'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。',
+      'Options（可选方案）：可在例会前或里程碑当天同步。Will（行动承诺）：周五前完成首次主动同步。',
+    ],
+  };
+  for (const typeId of ['A', 'C', 'D1']) {
+    assert.deepEqual(findPlanValidationIssues(nonSbiPlan, { typeId }), []);
+  }
+});
+
+test('所有画像类型都拒绝约定的方案占位内容', () => {
+  const base = {
+    entry: ['从本周协作目标切入。'],
+    cautions: ['聚焦行为。'],
+    frequency: '本周五复盘一次。',
+    gap_fix: ['把主动同步拆成可观察的小步骤。'],
+    scripts: [
+      'Goal（目标）：本周主动同步一次风险。Reality（现状）：目前通常要主管提醒后才同步。',
+      'Options（可选方案）：可在例会前同步。Will（行动承诺）：周五前完成。',
+    ],
+  };
+
+  for (const placeholder of ['XX项目', 'XX模块', 'X月X日', '某员工', '某任务']) {
+    const candidate = { ...base, entry: [`围绕${placeholder}开始沟通。`] };
+    assert.deepEqual(findPlanValidationIssues(candidate, { typeId: 'A' }), [
+      PLAN_VALIDATION_CODES.PLACEHOLDER_CONTENT,
+    ]);
+  }
 });
 
 test('反馈响应接受提示词步骤 4 的正常 JSON，并拒绝额外字段和边界外数组', () => {
