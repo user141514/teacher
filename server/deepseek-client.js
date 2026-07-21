@@ -24,6 +24,8 @@ function createDeepSeekClient({ fetchImpl = globalThis.fetch, apiKey } = {}) {
   async function complete({
     messages,
     validate,
+    diagnose,
+    buildRetryMessage,
     temperature = 0.2,
     maxTokens = 1200,
   } = {}) {
@@ -35,18 +37,19 @@ function createDeepSeekClient({ fetchImpl = globalThis.fetch, apiKey } = {}) {
       throw controlledError('MODEL_SERVICE_UNAVAILABLE');
     }
 
-    const requestBody = JSON.stringify({
-      model: 'deepseek-v4-pro',
-      stream: false,
-      temperature,
-      max_tokens: maxTokens,
-      thinking: { type: 'disabled' },
-      response_format: { type: 'json_object' },
-      messages,
-    });
-
+    let attemptMessages = messages;
     for (let attempt = 0; attempt < 2; attempt += 1) {
       try {
+        const requestBody = JSON.stringify({
+          model: 'deepseek-v4-pro',
+          stream: false,
+          temperature,
+          max_tokens: maxTokens,
+          thinking: { type: 'disabled' },
+          response_format: { type: 'json_object' },
+          messages: attemptMessages,
+        });
+
         const response = await fetchImpl(DEEPSEEK_URL, {
           method: 'POST',
           headers: {
@@ -82,6 +85,18 @@ function createDeepSeekClient({ fetchImpl = globalThis.fetch, apiKey } = {}) {
         }
 
         if (!validate(parsed)) {
+          if (attempt === 0
+            && typeof diagnose === 'function'
+            && typeof buildRetryMessage === 'function') {
+            const issues = diagnose(parsed);
+            const retryMessage = buildRetryMessage(Array.isArray(issues) ? issues : []);
+            if (typeof retryMessage === 'string' && retryMessage.trim() !== '') {
+              attemptMessages = [
+                ...messages,
+                { role: 'user', content: retryMessage },
+              ];
+            }
+          }
           throw invalidModelResponse();
         }
 
