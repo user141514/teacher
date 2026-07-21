@@ -7,14 +7,35 @@ param(
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
-$serviceUrl = 'http://127.0.0.1:4173/'
-$healthUrl = 'http://127.0.0.1:4173/api/health'
 
 function Stop-WithMessage {
   param([string]$Message)
 
   Write-Output $Message
   exit 1
+}
+
+function Get-ServicePort {
+  $rawPort = & $nodeCommand.Source '--env-file=.env' '-p' 'process.env.PORT ?? 4173'
+  if ($LASTEXITCODE -ne 0) {
+    Stop-WithMessage '无法读取 .env 中的 PORT 配置。'
+  }
+
+  [int]$parsedPort = 0
+  if (-not [int]::TryParse(([string]$rawPort).Trim(), [ref]$parsedPort) `
+    -or $parsedPort -lt 1 `
+    -or $parsedPort -gt 65535) {
+    Stop-WithMessage 'PORT 配置无效，请填写 1 至 65535 的整数。'
+  }
+
+  return $parsedPort
+}
+
+function Test-PortInUse {
+  param([int]$Port)
+
+  $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
+  return $null -ne ($listeners | Where-Object { $_.Port -eq $Port } | Select-Object -First 1)
 }
 
 function Test-HealthyService {
@@ -52,14 +73,16 @@ try {
     Stop-WithMessage '缺少 node_modules。请先运行 npm.cmd install 安装依赖。'
   }
 
-  if ($CheckOnly) {
-    Write-Output '环境检查通过，未启动服务。'
-    exit 0
+  $servicePort = Get-ServicePort
+  $serviceUrl = "http://127.0.0.1:$servicePort/"
+  $healthUrl = "${serviceUrl}api/health"
+
+  if (Test-PortInUse -Port $servicePort) {
+    Stop-WithMessage "端口 $servicePort 已被占用，未启动服务。请先关闭占用程序或修改 .env 中的 PORT。"
   }
 
-  if (Test-HealthyService) {
-    Write-Output '服务已在运行，复用现有服务。'
-    Open-ServiceInBrowser
+  if ($CheckOnly) {
+    Write-Output '环境检查通过，未启动服务。'
     exit 0
   }
 
