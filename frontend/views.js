@@ -37,6 +37,15 @@ function appendPreviousButton(footer, handlers) {
   footer.append(button('go-previous', '返回上一步', handlers.goPrevious, { secondary: true }));
 }
 
+function createPanelFooter() {
+  const footer = node('div', { className: 'panel-foot' });
+  footer.append(node('span', {
+    className: 'io-hint',
+    text: '输入 · AI动作 · 输出 均按功能清单落地',
+  }));
+  return footer;
+}
+
 function fieldLabel(forId, text, hint) {
   const label = node('label', { className: 'flabel', text, htmlFor: forId });
   if (hint) label.append(node('span', { className: 'dim', text: hint }));
@@ -74,7 +83,7 @@ function appendQuestions(target, questions) {
   target.append(list);
 }
 
-function createWorkspace(state, title, description) {
+function createWorkspace(state, stage, kick, title, description) {
   const fragment = document.createDocumentFragment();
   const header = node('div', { className: 'ws-head' });
   header.append(node('div', { className: 'ws-title', text: '教练助手' }));
@@ -105,8 +114,13 @@ function createWorkspace(state, title, description) {
   stepper.append(stepList);
 
   const panel = node('section', { className: 'panel' });
+  panel.dataset.stage = stage;
   const panelHead = node('div', { className: 'panel-head' });
-  panelHead.append(node('div', { className: 'panel-h', text: title }), node('div', { className: 'panel-desc', text: description }));
+  panelHead.append(
+    node('div', { className: 'panel-kick', text: kick }),
+    node('div', { className: 'panel-h', text: title }),
+    node('div', { className: 'panel-desc', text: description }),
+  );
   const body = node('div', { className: 'panel-body' });
   panel.append(panelHead, body);
   grid.append(stepper, panel);
@@ -368,6 +382,8 @@ function renderHome(root, state, handlers) {
 function renderIntake(root, state, handlers) {
   const { fragment, body, panel } = createWorkspace(
     state,
+    'intake',
+    '节点 ① · 输入',
     '员工信息输入',
     '分三部分描述这位待辅导员工。信息不足时，系统会继续追问关键项。',
   );
@@ -403,7 +419,7 @@ function renderIntake(root, state, handlers) {
       traits: document.getElementById('home-traits').value.trim(),
   });
 
-  const footer = node('div', { className: 'panel-foot' });
+  const footer = createPanelFooter();
   if (result.questions.length > 0) {
     footer.append(button('review-intake-again', state.busy ? '正在审查…' : '再次审查', () => {
       const answers = result.questions.map((question, index) => ({
@@ -425,12 +441,18 @@ function renderIntake(root, state, handlers) {
 }
 
 function renderClassification(root, state, handlers) {
-  const { fragment, body, panel } = createWorkspace(state, '类型判定', '展示能力 × 意愿的结构化判定；类型名称始终来自预置标签。');
+  const { fragment, body, panel } = createWorkspace(
+    state,
+    'classification',
+    '节点 ② · AI动作',
+    '类型判定',
+    '展示能力 × 意愿的结构化判定；类型名称始终来自预置标签。',
+  );
   const classification = state.classification;
   if (!classification) {
     body.append(node('div', { className: 'note', text: '信息已完整。请生成类型判定。' }));
     appendError(body, state.error);
-    const footer = node('div', { className: 'panel-foot' });
+    const footer = createPanelFooter();
     appendPreviousButton(footer, handlers);
     footer.append(button('generate-classification', state.busy ? '正在生成…' : '生成类型判定', handlers.generateClassification, { accent: true, disabled: state.busy }));
     panel.append(footer);
@@ -477,7 +499,7 @@ function renderClassification(root, state, handlers) {
   body.append(details);
   appendError(body, state.error);
 
-  const footer = node('div', { className: 'panel-foot' });
+  const footer = createPanelFooter();
   appendPreviousButton(footer, handlers);
   if (classification.status === '已判定') {
     const label = state.plan ? '继续查看方案' : (state.busy ? '正在生成…' : '生成辅导方案');
@@ -495,7 +517,13 @@ function renderClassification(root, state, handlers) {
 }
 
 function renderPlan(root, state, handlers) {
-  const { fragment, body, panel } = createWorkspace(state, '教练方案生成', '方案按结构化字段展示；叙述性建议经过安全 Markdown 渲染。');
+  const { fragment, body, panel } = createWorkspace(
+    state,
+    'plan',
+    '节点 ③ · 输出',
+    '教练方案生成',
+    '方案按结构化字段展示；叙述性建议经过安全 Markdown 渲染。',
+  );
   const report = node('div', { className: 'report', id: 'coach-plan' });
   markdownCard(report, 'plan-entry', '沟通切入点', state.plan.entry);
   markdownCard(report, 'plan-cautions', '沟通注意事项', state.plan.cautions);
@@ -506,7 +534,7 @@ function renderPlan(root, state, handlers) {
   markdownCard(report, 'plan-scripts', '话术示例', state.plan.scripts, { separateCoachingStages: true });
   body.append(report);
   appendError(body, state.error);
-  const footer = node('div', { className: 'panel-foot' });
+  const footer = createPanelFooter();
   appendPreviousButton(footer, handlers);
   footer.append(
     button('copy-plan', '复制方案', handlers.copyPlan, { secondary: true }),
@@ -518,7 +546,13 @@ function renderPlan(root, state, handlers) {
 }
 
 function renderFeedback(root, state, handlers) {
-  const { fragment, body, panel } = createWorkspace(state, '辅导反馈', '回填本次沟通后的情况，系统将给出下一步调整建议。');
+  const { fragment, body, panel } = createWorkspace(
+    state,
+    'feedback',
+    '节点 ④ · 会话内迭代',
+    '辅导反馈',
+    '回填本次沟通后的情况，系统将给出下一步调整建议。',
+  );
   body.append(textAreaField('feedback-text', '本次沟通后的情况', state.feedbackText || '', '例：他愿意主动接一个模块，但仍担心做不好。'));
   appendError(body, state.error);
   if (state.feedback) {
@@ -530,7 +564,7 @@ function renderFeedback(root, state, handlers) {
   } else {
     body.append(node('div', { id: 'followout' }));
   }
-  const footer = node('div', { className: 'panel-foot' });
+  const footer = createPanelFooter();
   appendPreviousButton(footer, handlers);
   footer.append(button('generate-feedback', state.busy ? '正在生成…' : '生成下一步建议', () => {
     handlers.generateFeedback(document.getElementById('feedback-text').value.trim());

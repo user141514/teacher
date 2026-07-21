@@ -107,6 +107,39 @@ test('欢迎页展示四步流程并在点击后进入员工信息输入', async
   await expect(page.getByLabel('绩效目标 / 上层期望')).toBeVisible();
 });
 
+test('完整流程五页使用统一的参考视觉结构', async ({ page }) => {
+  const requests = await mockCoachApi(page);
+  await page.goto('/');
+  await expect(page.locator('.welcome-page .welcome-card')).toBeVisible();
+
+  await fillHome(page);
+  await expect(page.locator('.ws-grid .stepper')).toBeVisible();
+  await page.getByRole('button', { name: '审查信息' }).click();
+  await page.getByLabel('追问 1').fill('尚未做过。');
+  await page.getByRole('button', { name: '再次审查' }).click();
+  await page.getByRole('button', { name: '生成类型判定' }).click();
+  await expect(page.locator('.panel[data-stage="classification"]')).toBeVisible();
+  await page.getByRole('button', { name: '生成辅导方案' }).click();
+  await expect(page.locator('.panel[data-stage="plan"] .report')).toBeVisible();
+  await page.getByRole('button', { name: '去反馈' }).click();
+  await expect(page.locator('.panel[data-stage="feedback"]')).toBeVisible();
+  expect(requests.map(({ method }) => method)).toEqual(['intake', 'intake', 'classify', 'plan']);
+});
+
+for (const width of [390, 768, 1440]) {
+  test(`${width}px 下五页布局没有整页横向溢出`, async ({ page }) => {
+    await page.setViewportSize({ width, height: 900 });
+    await page.goto('/');
+    await expect.poll(() => page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    )).toBe(true);
+    await openIntake(page);
+    await expect.poll(() => page.evaluate(
+      () => document.documentElement.scrollWidth <= document.documentElement.clientWidth,
+    )).toBe(true);
+  });
+}
+
 test('首页审查会追问缺失信息，并在补充后允许生成类型判定', async ({ page }) => {
   await mockCoachApi(page);
   await page.goto('/');
