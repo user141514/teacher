@@ -1,7 +1,7 @@
 const SESSION_KEYS = new Set([
   'screen', 'step', 'busy', 'intake', 'answers', 'intakeResult',
   'classification', 'plan', 'feedback', 'feedbackText', 'blocked', 'error',
-  'submissionKeys', 'selectedProfileId',
+  'submissionKeys', 'selectedProfileId', 'selectedTraits', 'traitNote',
 ]);
 
 export function createInitialState() {
@@ -21,6 +21,8 @@ export function createInitialState() {
     error: null,
     submissionKeys: { intake: null, classification: null, plan: null },
     selectedProfileId: null,
+    selectedTraits: [],
+    traitNote: '',
   };
 }
 
@@ -61,6 +63,29 @@ export function setClassification(classification) {
 
 export function setSelectedProfileId(selectedProfileId) {
   updateSession({ selectedProfileId: selectedProfileId || null });
+}
+
+export function setSelectedTraits(selectedTraits) {
+  const normalized = Array.isArray(selectedTraits)
+    ? [...new Set(selectedTraits.map((item) => String(item).trim()).filter(Boolean))]
+    : [];
+  updateSession({ selectedTraits: normalized });
+}
+
+export function setTraitNote(traitNote) {
+  updateSession({ traitNote: String(traitNote || '') });
+}
+
+export function composeTraits(selectedTraits = [], traitNote = '') {
+  const keywords = Array.isArray(selectedTraits)
+    ? selectedTraits.map((item) => String(item).trim()).filter(Boolean)
+    : [];
+  const note = String(traitNote || '').trim();
+  if (keywords.length > 0 && note) {
+    return `关键词：${keywords.join('、')}。补充描述：${note}`;
+  }
+  if (keywords.length > 0) return keywords.join('、');
+  return note;
 }
 
 export function setPlan(plan) {

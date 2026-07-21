@@ -4,12 +4,18 @@ import {
   publicProfileId,
   resolveFinalClassification,
 } from './profile-selection.js';
+import { composeTraits } from './state.js';
 
 const STEPS = [
   ['员工信息输入', '特征 + 绩效期望'],
   ['类型判定', '匹配能力 × 意愿画像'],
   ['教练方案生成', '差异化建议'],
   ['辅导反馈', '会话内迭代'],
+];
+
+const TRAIT_KEYWORDS = [
+  '学习能力强', '执行力弱', '主动性不足', '情绪易波动', '沟通抵触',
+  '责任心强', '经验不足', '追求稳定', '有上进心', '需要认可',
 ];
 
 export const BLOCKED_MESSAGE = '该事项涉及高风险人事决策，请转交 HR 按公司制度处理。本工具仅可协助准备一般辅导沟通。';
@@ -38,16 +44,36 @@ function button(id, text, onClick, { accent = false, secondary = false, disabled
   return control;
 }
 
+function icon(name, className = 'ui-icon') {
+  const image = document.createElement('img');
+  image.className = className;
+  image.src = `./assets/${name}.svg`;
+  image.alt = '';
+  image.setAttribute('aria-hidden', 'true');
+  return image;
+}
+
+function appendIcon(control, name) {
+  control.append(icon(name));
+  return control;
+}
+
+function prependIcon(control, name) {
+  control.prepend(icon(name));
+  return control;
+}
+
 function appendPreviousButton(footer, handlers) {
-  footer.append(button('go-previous', '返回上一步', handlers.goPrevious, { secondary: true }));
+  const previous = button('go-previous', '上一步', handlers.goPrevious, { secondary: true });
+  previous.setAttribute('aria-label', '返回上一步');
+  footer.append(previous);
 }
 
 function createPanelFooter() {
   const footer = node('div', { className: 'panel-foot' });
-  footer.append(node('span', {
-    className: 'io-hint',
-    text: '输入 · AI动作 · 输出 均按功能清单落地',
-  }));
+  const hint = node('span', { className: 'io-hint' });
+  hint.append(icon('io'), document.createTextNode('输入 · AI动作 · 输出 均按功能清单落地'));
+  footer.append(hint);
   return footer;
 }
 
@@ -88,10 +114,20 @@ function appendQuestions(target, questions) {
   target.append(list);
 }
 
-function createWorkspace(state, stage, kick, title, description) {
+function createWorkspace(state, stage, kick, title, description, handlers) {
   const fragment = document.createDocumentFragment();
   const header = node('div', { className: 'ws-head' });
-  header.append(node('div', { className: 'ws-title', text: '教练助手' }));
+  const homeButton = node('button', {
+    className: 'ws-back',
+    id: 'workspace-return-home',
+    type: 'button',
+  });
+  homeButton.setAttribute('aria-label', '返回首页');
+  homeButton.append(icon('arrow-left'));
+  homeButton.addEventListener('click', handlers.goHome);
+  const workspaceTitle = node('div', { className: 'ws-title', text: '教练助手' });
+  workspaceTitle.append(node('span', { className: 'tag', text: '管理团队' }));
+  header.append(homeButton, workspaceTitle);
   fragment.append(header);
 
   const grid = node('div', { className: 'ws-grid' });
@@ -348,7 +384,10 @@ function formatCoachingStageMarkdown(source) {
 
 function markdownCard(parent, id, title, source, options = {}) {
   const card = node('section', { className: 'rcard' });
-  card.append(node('h3', { className: 'rcard-h', text: title }));
+  const heading = node('h3', { className: 'rcard-h' });
+  if (options.marker) heading.append(node('span', { className: 'n', text: options.marker }));
+  heading.append(document.createTextNode(title));
+  card.append(heading);
   const content = node('div', { id });
   const markdown = normalizeMarkdownSource(source);
   window.renderMarkdown(
@@ -367,21 +406,52 @@ function renderHome(root, state, handlers) {
     if (index < 3) flow.append(node('span', { className: 'flowarr', text: '→' }));
   });
   const card = node('section', { className: 'hero-card welcome-card' });
+  const startButton = button('start-coaching', '开始辅导', handlers.startCoaching, { accent: true });
+  startButton.append(icon('arrow-right'));
   card.append(
     node('div', { className: 'home-eyebrow muted', text: '四步流程' }),
     flow,
-    button('start-coaching', '开始辅导', handlers.startCoaching, { accent: true }),
+    startButton,
   );
   section.append(
     node('div', { className: 'home-eyebrow', text: 'Management Compass · 管理团队' }),
     node('h1', { className: 'home-h1', text: '因材施教，给每个人对的辅导方式' }),
     node('p', {
       className: 'home-lead',
-      text: '描述一位待辅导员工，AI 按“能力 × 意愿”匹配 4 类画像，并输出差异化的沟通与教练方案。',
+      text: '描述一位待辅导员工，AI 按“能力 × 意愿”匹配 4 类画像，输出差异化的沟通与教练方案：说什么、注意什么、多久沟通一次、如何修正绩效差距。',
     }),
     card,
   );
   root.replaceChildren(section);
+}
+
+function intakeGroupTitle(number, title, hint, tone = 'pill-y') {
+  const heading = node('div', { className: 'flabel intake-section-title' });
+  heading.append(
+    node('span', { className: `pill ${tone}`, text: String(number) }),
+    document.createTextNode(title),
+  );
+  if (hint) heading.append(node('span', { className: 'dim', text: hint }));
+  return heading;
+}
+
+function intakeSelectField(id, labelText, options, value) {
+  const wrap = node('div', { className: 'intake-control' });
+  const label = node('label', { className: 'step-sub', text: labelText, htmlFor: id });
+  const select = node('select', { id, value: value || options[0] });
+  for (const optionText of options) select.append(node('option', { text: optionText, value: optionText }));
+  select.value = value || options[0];
+  wrap.append(label, select);
+  return wrap;
+}
+
+function intakeTextAreaField(id, labelText, value, placeholder) {
+  const wrap = node('div', { className: 'intake-control' });
+  const label = node('label', { className: 'step-sub', text: labelText, htmlFor: id });
+  const input = node('textarea', { id, value: value || '' });
+  input.placeholder = placeholder;
+  wrap.append(label, input);
+  return wrap;
 }
 
 function renderIntake(root, state, handlers) {
@@ -391,18 +461,50 @@ function renderIntake(root, state, handlers) {
     '节点 ① · 输入',
     '员工信息输入',
     '分三部分描述这位待辅导员工。信息不足时，系统会继续追问关键项。',
+    handlers,
   );
+  const basicSection = node('section', { className: 'field intake-section' });
   const basic = node('div', { className: 'grid2' });
   basic.append(
-    selectField('home-role', '岗位类别', ['基层执行岗', '骨干/带教岗', '基层管理岗'], state.intake.role),
-    selectField('home-tenure', '在团队入职时长', ['3 个月内（新人）', '3–12 个月', '1 年以上'], state.intake.tenure),
+    intakeSelectField('home-role', '岗位类别', ['基层执行岗', '骨干/带教岗', '基层管理岗'], state.intake.role),
+    intakeSelectField('home-tenure', '在团队入职时长', ['3 个月内（新人）', '3–12 个月', '1 年以上'], state.intake.tenure),
+  );
+  const performance = intakeSelectField('home-performance', '当前绩效状态', ['持续达标', '波动 / 时好时坏', '连续未达标'], state.intake.performance);
+  performance.classList.add('intake-control-wide');
+  basicSection.append(intakeGroupTitle(1, '员工基础信息'), basic, performance);
+
+  const goalSection = node('section', { className: 'field intake-section' });
+  const goal = intakeTextAreaField('home-goal', '绩效目标 / 上层期望', state.intake.goal, '例：季度内独立承接 3 个项目，达成 90% 交付准时率');
+  const pain = intakeTextAreaField('home-pain', '近期辅导困扰', state.intake.pain, '例：能力够但主动性差，交代的事不追就停，沟通易抵触');
+  pain.classList.add('intake-control-spaced');
+  goalSection.append(intakeGroupTitle(2, '目标与困扰', '', 'pill-t'), goal, pain);
+
+  const traitsSection = node('section', { className: 'field intake-section' });
+  const chipset = node('div', { className: 'chipset' });
+  for (const keyword of TRAIT_KEYWORDS) {
+    const selected = state.selectedTraits.includes(keyword);
+    const chip = node('button', {
+      className: `chip ${selected ? 'sel' : ''}`,
+      text: keyword,
+      type: 'button',
+    });
+    chip.setAttribute('aria-pressed', String(selected));
+    chip.addEventListener('click', () => handlers.toggleTrait(keyword));
+    chipset.append(chip);
+  }
+  const traitNote = node('textarea', { id: 'home-traits', value: state.traitNote || '' });
+  traitNote.placeholder = '补充描述（选填）';
+  traitNote.setAttribute('aria-label', '员工特征补充');
+  traitNote.addEventListener('input', (event) => handlers.updateTraitNote(event.target.value));
+  traitsSection.append(
+    intakeGroupTitle(3, '员工特征描述', '勾选关键词，或补充自由文本'),
+    chipset,
+    traitNote,
   );
   body.append(
-    basic,
-    selectField('home-performance', '当前绩效状态', ['持续达标', '波动 / 时好时坏', '连续未达标'], state.intake.performance),
-    textAreaField('home-goal', '绩效目标 / 上层期望', state.intake.goal, '例：季度内独立承接 3 个项目'),
-    textAreaField('home-pain', '近期辅导困扰', state.intake.pain, '例：能力够但主动性差，交代的事不追就停'),
-    textAreaField('home-traits', '员工特征补充', state.intake.traits, '补充可观察到的能力、意愿或行为证据'),
+    basicSection,
+    goalSection,
+    traitsSection,
   );
   const result = state.intakeResult || { questions: [] };
   if (result.questions.length > 0) {
@@ -421,7 +523,7 @@ function renderIntake(root, state, handlers) {
       performance: document.getElementById('home-performance').value,
       goal: document.getElementById('home-goal').value.trim(),
       pain: document.getElementById('home-pain').value.trim(),
-      traits: document.getElementById('home-traits').value.trim(),
+      traits: composeTraits(state.selectedTraits, document.getElementById('home-traits').value),
   });
 
   const footer = createPanelFooter();
@@ -436,10 +538,12 @@ function renderIntake(root, state, handlers) {
   } else {
     const submitLabel = result.sufficient
       ? '继续类型判定'
-      : state.busy ? '正在审查…' : '审查信息';
-    footer.append(button('review-intake', submitLabel, () => {
+      : state.busy ? '正在判定…' : '判定类型';
+    const submit = button('review-intake', submitLabel, () => {
       handlers.reviewIntake(intakeValues());
-    }, { accent: true, disabled: state.busy }));
+    }, { accent: true, disabled: state.busy });
+    if (!result.sufficient && !state.busy) appendIcon(submit, 'arrow-right');
+    footer.append(submit);
   }
   panel.append(footer);
   root.replaceChildren(fragment);
@@ -451,7 +555,8 @@ function renderClassification(root, state, handlers) {
     'classification',
     '节点 ② · AI动作',
     '类型判定',
-    '基于能力 × 意愿匹配四类画像。AI 给出推荐，你可以确认或改选。',
+    '基于“能力 × 意愿”预置的 4 类画像，AI 匹配到最接近的一类并说明依据。你可确认或改选。',
+    handlers,
   );
   const classification = state.classification;
   if (!classification) {
@@ -467,6 +572,12 @@ function renderClassification(root, state, handlers) {
 
   let finalClassification = classification;
   if (classification.status === '已判定') {
+    const profileNote = node('div', { className: 'note classification-note' });
+    profileNote.append(
+      icon('info', 'ui-icon note-icon'),
+      node('div', { text: '4 类画像名称与关键词来自知识库，最终方案以本次确认画像为准。' }),
+    );
+    body.append(profileNote);
     const typeGrid = node('div', { className: 'typegrid' });
     typeGrid.setAttribute('role', 'radiogroup');
     typeGrid.setAttribute('aria-label', '员工画像选择');
@@ -509,7 +620,8 @@ function renderClassification(root, state, handlers) {
     );
   }
 
-  const details = node('div', { className: 'rcard' });
+  const details = node('section', { className: 'rcard classification-details' });
+  const meta = node('div', { className: 'classification-meta' });
   const rows = [
     [CLASSIFICATION_LABELS.status, finalClassification.status],
     [CLASSIFICATION_LABELS.classification_confidence, classification.classification_confidence],
@@ -519,31 +631,52 @@ function renderClassification(root, state, handlers) {
     [CLASSIFICATION_LABELS.coach_mode, finalClassification.coach_mode],
   ];
   rows.forEach(([label, value]) => {
-    const row = node('p');
+    const row = node('span', { className: 'classification-meta-item' });
     row.append(node('strong', { text: `${label}：` }), document.createTextNode(value || '未提供'));
-    details.append(row);
+    meta.append(row);
   });
-  details.append(
-    node('h3', { className: 'rcard-h', text: CLASSIFICATION_LABELS.reason }),
-    node('p', { text: finalClassification.reason || '未提供' }),
+  details.append(meta);
+  const reasoning = node('div', { className: 'reasoning classification-reasoning' });
+  reasoning.append(
+    node('h3', { className: 'rcard-h classification-reason-title', text: CLASSIFICATION_LABELS.reason }),
+    (() => {
+      const reason = node('p');
+      reason.append(
+        node('strong', { text: '判定依据：' }),
+        document.createTextNode(finalClassification.reason || '未提供'),
+      );
+      return reason;
+    })(),
   );
-  details.append(node('h3', { className: 'rcard-h', text: '判定证据' }));
-  appendQuestions(details, classification.evidence);
-  if (classification.questions.length > 0) {
-    details.append(node('h3', { className: 'rcard-h', text: '仍需确认' }));
-    appendQuestions(details, classification.questions);
+  if (Array.isArray(classification.evidence) && classification.evidence.length > 0) {
+    const evidence = node('p', { className: 'classification-evidence' });
+    evidence.append(
+      node('strong', { text: '判定证据：' }),
+      document.createTextNode(classification.evidence.join('；')),
+    );
+    reasoning.append(evidence);
   }
+  if (classification.questions.length > 0) {
+    const questions = node('div', { className: 'classification-questions' });
+    questions.append(node('h3', { className: 'rcard-h', text: '仍需确认' }));
+    appendQuestions(questions, classification.questions);
+    reasoning.append(questions);
+  }
+  details.append(reasoning);
   body.append(details);
   appendError(body, state.error);
 
   const footer = createPanelFooter();
   appendPreviousButton(footer, handlers);
   if (classification.status === '已判定') {
-    const label = state.plan ? '继续查看方案' : (state.busy ? '正在生成…' : '生成辅导方案');
-    footer.append(button('generate-plan', label, handlers.generatePlan, {
+    const label = state.plan ? '查看方案' : (state.busy ? '正在生成…' : '生成方案');
+    const generate = button('generate-plan', label, handlers.generatePlan, {
       accent: true,
       disabled: state.busy,
-    }));
+    });
+    generate.setAttribute('aria-label', state.plan ? '继续查看方案' : '生成辅导方案');
+    if (!state.busy) appendIcon(generate, 'arrow-right');
+    footer.append(generate);
   } else if (classification.status === '待人工确认') {
     footer.append(button('manual-confirmation', '人工确认', handlers.goHome, { secondary: true }));
   } else {
@@ -554,29 +687,42 @@ function renderClassification(root, state, handlers) {
 }
 
 function renderPlan(root, state, handlers) {
+  const profileId = state.selectedProfileId || publicProfileId(state.classification?.type_id);
+  const profile = PUBLIC_PROFILES.find(({ id }) => id === profileId);
   const { fragment, body, panel } = createWorkspace(
     state,
     'plan',
     '节点 ③ · 输出',
     '教练方案生成',
-    '方案按结构化字段展示；叙述性建议经过安全 Markdown 渲染。',
+    `针对“${profile?.name || '当前画像'}”生成的差异化方案。可复制，或让 AI 换个角度重出。`,
+    handlers,
   );
   const report = node('div', { className: 'report', id: 'coach-plan' });
-  markdownCard(report, 'plan-entry', '沟通切入点', state.plan.entry);
-  markdownCard(report, 'plan-cautions', '沟通注意事项', state.plan.cautions);
+  markdownCard(report, 'plan-entry', '沟通切入点', state.plan.entry, { marker: '切' });
+  markdownCard(report, 'plan-cautions', '沟通注意事项', state.plan.cautions, { marker: '注' });
   const frequency = node('section', { className: 'rcard' });
-  frequency.append(node('h3', { className: 'rcard-h', text: '建议沟通频率' }), node('p', { id: 'plan-frequency', text: state.plan.frequency || '' }));
+  const frequencyHeading = node('h3', { className: 'rcard-h' });
+  frequencyHeading.append(node('span', { className: 'n', text: '频' }), document.createTextNode('建议沟通频率'));
+  frequency.append(frequencyHeading, node('p', { id: 'plan-frequency', text: state.plan.frequency || '' }));
   report.append(frequency);
-  markdownCard(report, 'plan-gap-fix', '绩效差距修正方法', state.plan.gap_fix, { separateCoachingStages: true });
-  markdownCard(report, 'plan-scripts', '话术示例', state.plan.scripts, { separateCoachingStages: true });
+  markdownCard(report, 'plan-gap-fix', '绩效差距修正方法', state.plan.gap_fix, { marker: '修', separateCoachingStages: true });
+  markdownCard(report, 'plan-scripts', '话术示例', state.plan.scripts, { marker: '话', separateCoachingStages: true });
   body.append(report);
   appendError(body, state.error);
   const footer = createPanelFooter();
   appendPreviousButton(footer, handlers);
+  const copy = button('copy-plan', '复制方案', handlers.copyPlan, { secondary: true });
+  copy.classList.add('btn-sm');
+  prependIcon(copy, 'copy');
+  const regenerate = button('regenerate-plan', state.busy ? '正在生成…' : '换个角度', handlers.regeneratePlan, { secondary: true, disabled: state.busy });
+  regenerate.classList.add('btn-sm');
+  if (!state.busy) prependIcon(regenerate, 'refresh');
+  const feedback = button('go-feedback', '去反馈', handlers.goFeedback, { accent: true });
+  appendIcon(feedback, 'arrow-right');
   footer.append(
-    button('copy-plan', '复制方案', handlers.copyPlan, { secondary: true }),
-    button('regenerate-plan', state.busy ? '正在生成…' : '换个角度', handlers.regeneratePlan, { secondary: true, disabled: state.busy }),
-    button('go-feedback', '去反馈', handlers.goFeedback, { accent: true }),
+    copy,
+    regenerate,
+    feedback,
   );
   panel.append(footer);
   root.replaceChildren(fragment);
@@ -588,24 +734,56 @@ function renderFeedback(root, state, handlers) {
     'feedback',
     '节点 ④ · 会话内迭代',
     '辅导反馈',
-    '回填本次沟通后的情况，系统将给出下一步调整建议。',
+    '回填本次沟通后的情况，AI 基于记录给出下一步调整建议。记录仅在本次会话内留存。',
+    handlers,
   );
-  body.append(textAreaField('feedback-text', '本次沟通后的情况', state.feedbackText || '', '例：他愿意主动接一个模块，但仍担心做不好。'));
+  body.append(textAreaField('feedback-text', '本次沟通后的情况', state.feedbackText || '', '例：按赋权式沟通谈了一次，他愿意主动接一个模块，但仍担心做不好。'));
+  const generate = button('generate-feedback', state.busy ? '正在生成…' : '生成下一步建议', () => {
+    handlers.generateFeedback(document.getElementById('feedback-text').value.trim());
+  }, { accent: true, disabled: state.busy });
+  generate.classList.add('btn-sm', 'feedback-generate');
+  if (!state.busy) prependIcon(generate, 'refresh-light');
+  body.append(generate);
   appendError(body, state.error);
+  let output;
   if (state.feedback) {
-    const output = node('div', { className: 'report', id: 'followout' });
+    output = node('div', { className: 'report feedback-output', id: 'followout' });
     markdownCard(output, 'feedback-progress', '进展解读', state.feedback.progress_read);
     markdownCard(output, 'feedback-next-steps', '下一步建议', state.feedback.next_steps, { separateCoachingStages: true });
     markdownCard(output, 'feedback-watch-points', '观察要点', state.feedback.watch_points);
-    body.append(output);
   } else {
-    body.append(node('div', { id: 'followout' }));
+    output = node('div', { className: 'feedback-output', id: 'followout' });
   }
+  body.append(output);
+
+  const finalClassification = resolveFinalClassification(
+    state.classification,
+    state.selectedProfileId || publicProfileId(state.classification?.type_id),
+    state.intake,
+  );
+  const profile = PUBLIC_PROFILES.find(({ id }) => id === publicProfileId(finalClassification?.type_id));
+  const rawEntry = Array.isArray(state.plan?.entry) ? state.plan.entry[0] : state.plan?.entry;
+  const entrySummary = String(rawEntry || '').replace(/[\*_`#]/g, '').trim();
+  const planRecord = [entrySummary, state.plan?.frequency].filter(Boolean).join(' · ');
+  const log = node('section', { className: 'session-log' });
+  log.append(node('div', { className: 'flabel session-log-title', text: '会话内辅导记录' }));
+  const typeItem = node('div', { className: 'logitem' });
+  typeItem.append(
+    node('div', { className: 'who', text: '类型判定' }),
+    document.createTextNode(`${profile?.name || '未判定'} · ${finalClassification?.ability || '未判定'}能力${finalClassification?.will || '未判定'}意愿`),
+  );
+  const planItem = node('div', { className: 'logitem' });
+  planItem.append(
+    node('div', { className: 'who', text: '首次方案' }),
+    document.createTextNode(planRecord || '暂无方案摘要'),
+  );
+  log.append(typeItem, planItem);
+  body.append(log);
   const footer = createPanelFooter();
   appendPreviousButton(footer, handlers);
-  footer.append(button('generate-feedback', state.busy ? '正在生成…' : '生成下一步建议', () => {
-    handlers.generateFeedback(document.getElementById('feedback-text').value.trim());
-  }, { accent: true, disabled: state.busy }));
+  const complete = button('complete-coaching', '完成辅导', handlers.goHome, { accent: true });
+  appendIcon(complete, 'arrow-right');
+  footer.append(complete);
   panel.append(footer);
   root.replaceChildren(fragment);
 }

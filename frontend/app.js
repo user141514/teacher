@@ -17,6 +17,8 @@ import {
   setPlan,
   setScreen,
   setSelectedProfileId,
+  setSelectedTraits,
+  setTraitNote,
 } from './state.js';
 import {
   cancelPendingRequests,
@@ -177,6 +179,18 @@ function selectProfile(profileId) {
   render();
 }
 
+function toggleTrait(trait) {
+  const selected = session.selectedTraits.includes(trait)
+    ? session.selectedTraits.filter((item) => item !== trait)
+    : [...session.selectedTraits, trait];
+  setSelectedTraits(selected);
+  render();
+}
+
+function updateTraitNote(value) {
+  setTraitNote(value);
+}
+
 function finalClassification() {
   return resolveFinalClassification(
     session.classification,
@@ -278,6 +292,8 @@ const handlers = {
   reviewAgain,
   generateClassification,
   selectProfile,
+  toggleTrait,
+  updateTraitNote,
   generatePlan: () => requestPlan(false),
   regeneratePlan: () => requestPlan(true),
   generateFeedback,
