@@ -1,5 +1,5 @@
 const SESSION_KEYS = new Set([
-  'screen', 'step', 'busy', 'intake', 'answers', 'intakeResult',
+  'screen', 'step', 'busy', 'busyAction', 'intake', 'answers', 'intakeResult',
   'classification', 'plan', 'feedback', 'feedbackText', 'blocked', 'error',
   'submissionKeys', 'selectedProfileId', 'selectedTraits', 'traitNote',
 ]);
@@ -9,6 +9,7 @@ export function createInitialState() {
     screen: 'home',
     step: 1,
     busy: false,
+    busyAction: null,
     requestEpoch: 0,
     intake: {},
     answers: [],
@@ -41,8 +42,12 @@ export function setScreen(screen, step) {
   updateSession({ screen, ...(step ? { step } : {}) });
 }
 
-export function setBusy(busy) {
-  updateSession({ busy: Boolean(busy) });
+export function setBusy(busy, busyAction = null) {
+  const active = Boolean(busy);
+  updateSession({
+    busy: active,
+    busyAction: active ? String(busyAction || '') || null : null,
+  });
 }
 
 export function setIntake(intake) {

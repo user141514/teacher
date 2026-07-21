@@ -173,6 +173,32 @@ test('员工特征纯函数按关键词和补充文本合成现有 traits 字段
   ]);
 });
 
+test('加载动作有固定枚举且结束 busy 时会清空当前动作', async ({ page }) => {
+  await page.goto('/');
+  const result = await page.evaluate(async () => {
+    const loading = await import('/loading.js');
+    const state = await import('/state.js');
+    state.resetSession();
+    state.setBusy(true, loading.BUSY_ACTIONS.PLAN_REGENERATE);
+    const active = {
+      busy: state.session.busy,
+      action: state.session.busyAction,
+      remaining: loading.remainingLoadingDelay(100, 250),
+    };
+    state.setBusy(false);
+    const finished = {
+      busy: state.session.busy,
+      action: state.session.busyAction,
+    };
+    return { active, finished };
+  });
+
+  expect(result).toEqual({
+    active: { busy: true, action: 'plan-regenerate', remaining: 150 },
+    finished: { busy: false, action: null },
+  });
+});
+
 test('桌面员工输入页对齐参考结构并把可访问关键词真实提交到 intake', async ({ page }) => {
   const requests = await mockCoachApi(page);
   await page.setViewportSize({ width: 1920, height: 1080 });
