@@ -225,13 +225,14 @@ async function requestPlan(regenerate) {
     return;
   }
   setError(null);
-  setBusy(true);
-  render();
-  const result = await generatePlan({
-    ...planInput,
-    regenerate,
-    previousPlan: regenerate ? session.plan : null,
-  });
+  const result = await requestWithLoading(
+    regenerate ? BUSY_ACTIONS.PLAN_REGENERATE : BUSY_ACTIONS.PLAN_GENERATE,
+    () => generatePlan({
+      ...planInput,
+      regenerate,
+      previousPlan: regenerate ? session.plan : null,
+    }),
+  );
   const data = consume(result);
   if (!data) return;
   clearDownstream('plan');
@@ -244,13 +245,14 @@ async function requestPlan(regenerate) {
 async function generateFeedback(feedbackText) {
   setFeedbackText(feedbackText);
   setError(null);
-  setBusy(true);
-  render();
-  const result = await submitFeedback({
-    classification: finalClassification(),
-    planSummary: planSummary(),
-    feedbackText,
-  });
+  const result = await requestWithLoading(
+    BUSY_ACTIONS.FEEDBACK_GENERATE,
+    () => submitFeedback({
+      classification: finalClassification(),
+      planSummary: planSummary(),
+      feedbackText,
+    }),
+  );
   const data = consume(result);
   if (!data) return;
   setFeedback(data);
