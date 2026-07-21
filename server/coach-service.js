@@ -1,4 +1,6 @@
 const {
+  PLAN_VALIDATION_CODES,
+  findPlanValidationIssues,
   validateIntake,
   validateModelClassification,
   validateClassification,
@@ -100,8 +102,36 @@ function hasNonEmptyPreviousPlan(value) {
   return isPlainRecord(value) && Object.keys(value).length > 0;
 }
 
+const PLAN_RETRY_GUIDANCE = Object.freeze({
+  [PLAN_VALIDATION_CODES.INVALID_SCHEMA]: '输出必须是且仅是包含 entry、cautions、frequency、gap_fix、scripts 的完整 JSON 对象，并满足既有字段类型与数组长度。',
+  [PLAN_VALIDATION_CODES.INVALID_GROW]: 'scripts 必须恰好 2 条：第 1 条严格按 Goal（目标）→ Reality（现状），第 2 条严格按 Options（可选方案）→ Will（行动承诺），每段非空。',
+  [PLAN_VALIDATION_CODES.MISSING_GAP_FIX_SBI]: 'gap_fix 至少一条必须严格按 Situation（情境）→ Behavior（行为）→ Impact（影响）且每段非空。',
+  [PLAN_VALIDATION_CODES.MISSING_SCRIPT_SBI]: 'scripts 第 1 条必须在 Reality（现状）后加入完整 Situation（情境）→ Behavior（行为）→ Impact（影响）。',
+  [PLAN_VALIDATION_CODES.PLACEHOLDER_CONTENT]: '删除所有占位内容，只能引用 normalized_profile 中的真实目标、行为、任务和时间；事实不足时明确说明需要补充。',
+});
+
+function buildPlanRetryMessage(issues) {
+  const guidance = [...new Set(issues)]
+    .map((code) => ({ code, guidance: PLAN_RETRY_GUIDANCE[code] }))
+    .filter((item) => item.guidance);
+
+  return [
+    'PLAN_CONTRACT_REPAIR',
+    '上一输出未通过严格方案契约。请重新生成完整 JSON，不要解释，不要使用 Markdown 代码围栏。',
+    ...guidance.map(({ code, guidance: item }) => `- ${code}: ${item}`),
+    '- 保留原始请求中的画像类型、策略、教练模式和 normalized_profile，不得改变分类结论。',
+  ].join('\n');
+}
+
 function createCoachService({ promptLoader, client } = {}) {
-  async function completeStep(step, payload, validate, temperature, maxTokens) {
+  async function completeStep(
+    step,
+    payload,
+    validate,
+    temperature,
+    maxTokens,
+    retryOptions = {},
+  ) {
     if (!promptLoader || typeof promptLoader.buildMessages !== 'function'
       || !client || typeof client.complete !== 'function') {
       throw controlledError('MODEL_SERVICE_UNAVAILABLE');
@@ -112,6 +142,7 @@ function createCoachService({ promptLoader, client } = {}) {
       validate,
       temperature,
       maxTokens,
+      ...retryOptions,
     });
 
     if (!validate(result)) {
@@ -182,10 +213,11 @@ function createCoachService({ promptLoader, client } = {}) {
       return CLASSIFICATION_NOT_READY;
     }
 
-    const requiresSbi = ['B', 'D2'].includes(request.classification.type_id);
-    const validate = (payload) => validatePlan(payload, {
-      typeId: request.classification.type_id,
-    });
+    const typeId = request.classification.type_id;
+    const requiresSbi = ['B', 'D2'].includes(typeId);
+    const validate = (payload) => validatePlan(payload, { typeId });
+    const diagnose = (payload) => findPlanValidationIssues(payload, { typeId });
+    const temperature = request.regenerate ? 0.45 : 0.3;
     const result = await completeStep(3, {
       classification_status: request.classification.status,
       type_id: request.classification.type_id,
@@ -198,7 +230,10 @@ function createCoachService({ promptLoader, client } = {}) {
       pain: request.pain,
       regenerate: request.regenerate === true,
       previous_plan: request.previousPlan,
-    }, validate, 0.55, 1400);
+    }, validate, temperature, 1400, {
+      diagnose,
+      buildRetryMessage: buildPlanRetryMessage,
+    });
     const highRiskIntent = findHighRiskIntent(result);
 
     return highRiskIntent ? { blocked: true, ...highRiskIntent } : result;
