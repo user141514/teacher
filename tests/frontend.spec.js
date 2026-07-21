@@ -25,7 +25,15 @@ async function mockCoachApi(page, fixtures = defaultFixtures()) {
   return requests;
 }
 
+async function openIntake(page) {
+  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' }))
+    .toBeVisible();
+  await page.getByRole('button', { name: '开始辅导' }).click();
+  await expect(page.locator('.panel-h')).toHaveText('员工信息输入');
+}
+
 async function fillHome(page) {
+  await openIntake(page);
   await page.getByLabel('岗位类别').selectOption({ label: '骨干/带教岗' });
   await page.getByLabel('在团队入职时长').selectOption({ label: '1 年以上' });
   await page.getByLabel('当前绩效状态').selectOption({ label: '持续达标' });
@@ -86,6 +94,19 @@ test('页面和健康检查由同一服务提供', async ({ page, request }) => 
   expect(new URL(page.url()).origin).toBe(new URL(health.url()).origin);
 });
 
+test('欢迎页展示四步流程并在点击后进入员工信息输入', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' }))
+    .toBeVisible();
+  await expect(page.locator('.hero-flow .flowchip')).toHaveText([
+    '信息输入', '类型判定', '方案生成', '辅导反馈',
+  ]);
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveCount(0);
+
+  await openIntake(page);
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toBeVisible();
+});
+
 test('首页审查会追问缺失信息，并在补充后允许生成类型判定', async ({ page }) => {
   await mockCoachApi(page);
   await page.goto('/');
@@ -105,6 +126,9 @@ test('刷新后回到空白首页，不保留上次输入或会话数据', async
   await fillHome(page);
   await page.reload();
 
+  await expect(page.getByRole('button', { name: '开始辅导' })).toBeVisible();
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveCount(0);
+  await openIntake(page);
   await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('');
   await expect(page.getByLabel('近期辅导困扰')).toHaveValue('');
   await expect(page.getByLabel('员工特征补充')).toHaveValue('');
@@ -121,6 +145,8 @@ test('顶部返回首页会从方案页清空当前会话', async ({ page }) => 
   await returnHome.click();
 
   await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveCount(0);
+  await openIntake(page);
   await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('');
   await expect(page.getByLabel('近期辅导困扰')).toHaveValue('');
   await expect(page.getByLabel('员工特征补充')).toHaveValue('');
@@ -139,7 +165,7 @@ test('第 2、3、4 步可以逐步返回且返回操作不重复调用 API', as
   await expect(page.locator('#type-card-B')).toContainText('成熟待激活型');
 
   await page.getByRole('button', { name: '返回上一步' }).click();
-  await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await expect(page.locator('.panel-h')).toHaveText('员工信息输入');
   await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('独立承接三个项目');
   await expect(page.getByLabel('近期辅导困扰')).toHaveValue('交代的事不追就停');
   await expect(page.getByRole('button', { name: '返回上一步' })).toHaveCount(0);
@@ -269,10 +295,12 @@ test('顶部返回首页后迟到请求不会恢复旧会话', async ({ page }) 
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
 
   await expect(page.getByRole('heading', { name: '因材施教，给每个人对的辅导方式' })).toBeVisible();
+  await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveCount(0);
+  await openIntake(page);
   await expect(page.getByLabel('绩效目标 / 上层期望')).toHaveValue('');
   await expect(page.getByLabel('近期辅导困扰')).toHaveValue('');
   await expect(page.getByLabel('员工特征补充')).toHaveValue('');
-  await expect(page.locator('.panel-h')).toHaveCount(0);
+  await expect(page.locator('.panel-h')).toHaveText('员工信息输入');
 });
 
 test('窄屏下顶部返回首页持续可见且不造成横向溢出', async ({ page }) => {

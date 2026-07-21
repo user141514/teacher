@@ -45,10 +45,19 @@ function returnHome() {
 }
 
 const PREVIOUS_SCREEN = Object.freeze({
-  classification: ['home', 1],
+  classification: ['intake', 1],
   plan: ['classification', 2],
   feedback: ['plan', 3],
 });
+
+function startCoaching() {
+  cancelPendingRequests();
+  setBusy(false);
+  setError(null);
+  setScreen('intake', 1);
+  render();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
 function goPrevious() {
   const target = PREVIOUS_SCREEN[session.screen];
@@ -243,6 +252,7 @@ function continueSupplement() {
 }
 
 const handlers = {
+  startCoaching,
   reviewIntake,
   reviewAgain,
   generateClassification,

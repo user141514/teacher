@@ -341,64 +341,85 @@ function markdownCard(parent, id, title, source, options = {}) {
 }
 
 function renderHome(root, state, handlers) {
-  const section = node('section');
+  const section = node('section', { className: 'welcome-page' });
+  const flow = node('div', { className: 'hero-flow', id: 'welcome-flow' });
+  ['信息输入', '类型判定', '方案生成', '辅导反馈'].forEach((label, index) => {
+    flow.append(node('span', { className: 'flowchip', text: label }));
+    if (index < 3) flow.append(node('span', { className: 'flowarr', text: '→' }));
+  });
+  const card = node('section', { className: 'hero-card welcome-card' });
+  card.append(
+    node('div', { className: 'home-eyebrow muted', text: '四步流程' }),
+    flow,
+    button('start-coaching', '开始辅导', handlers.startCoaching, { accent: true }),
+  );
   section.append(
     node('div', { className: 'home-eyebrow', text: 'Management Compass · 管理团队' }),
     node('h1', { className: 'home-h1', text: '因材施教，给每个人对的辅导方式' }),
-    node('p', { className: 'home-lead', text: '描述待辅导员工的表现与困扰。系统会先审查信息是否足够，再依次完成类型判定、方案生成和反馈迭代。' }),
+    node('p', {
+      className: 'home-lead',
+      text: '描述一位待辅导员工，AI 按“能力 × 意愿”匹配 4 类画像，并输出差异化的沟通与教练方案。',
+    }),
+    card,
   );
-  const card = node('form', { className: 'hero-card', id: 'home-intake-form' });
+  root.replaceChildren(section);
+}
+
+function renderIntake(root, state, handlers) {
+  const { fragment, body, panel } = createWorkspace(
+    state,
+    '员工信息输入',
+    '分三部分描述这位待辅导员工。信息不足时，系统会继续追问关键项。',
+  );
   const basic = node('div', { className: 'grid2' });
   basic.append(
     selectField('home-role', '岗位类别', ['基层执行岗', '骨干/带教岗', '基层管理岗'], state.intake.role),
     selectField('home-tenure', '在团队入职时长', ['3 个月内（新人）', '3–12 个月', '1 年以上'], state.intake.tenure),
   );
-  card.append(
-    node('div', { className: 'home-eyebrow', text: '员工信息输入' }),
+  body.append(
     basic,
     selectField('home-performance', '当前绩效状态', ['持续达标', '波动 / 时好时坏', '连续未达标'], state.intake.performance),
     textAreaField('home-goal', '绩效目标 / 上层期望', state.intake.goal, '例：季度内独立承接 3 个项目'),
     textAreaField('home-pain', '近期辅导困扰', state.intake.pain, '例：能力够但主动性差，交代的事不追就停'),
     textAreaField('home-traits', '员工特征补充', state.intake.traits, '补充可观察到的能力、意愿或行为证据'),
   );
-  appendError(card, state.error);
-  const submitLabel = state.intakeResult && state.intakeResult.sufficient
-    ? '继续类型判定'
-    : state.busy ? '正在审查…' : '审查信息';
-  const submit = button('review-intake', submitLabel, () => {
-    handlers.reviewIntake({
+  const result = state.intakeResult || { questions: [] };
+  if (result.questions.length > 0) {
+    body.append(node('div', { className: 'note', text: '请补充：' }));
+    appendQuestions(body.lastElementChild, result.questions);
+    result.questions.forEach((question, index) => {
+      const prior = state.answers.find((answer) => answer.question === question);
+      body.append(textAreaField(`followup-${index}`, `追问 ${index + 1}`, prior ? prior.answer : '', question));
+    });
+  }
+  appendError(body, state.error);
+
+  const intakeValues = () => ({
       role: document.getElementById('home-role').value,
       tenure: document.getElementById('home-tenure').value,
       performance: document.getElementById('home-performance').value,
       goal: document.getElementById('home-goal').value.trim(),
       pain: document.getElementById('home-pain').value.trim(),
       traits: document.getElementById('home-traits').value.trim(),
-    });
-  }, { accent: true, disabled: state.busy });
-  card.append(submit);
-  section.append(card);
-  root.replaceChildren(section);
-}
-
-function renderIntake(root, state, handlers) {
-  const { fragment, body, panel } = createWorkspace(state, '补充关键信息', '请补充系统列出的追问，以便继续完成类型判定。');
-  const result = state.intakeResult || { questions: [] };
-  body.append(node('div', { className: 'note', text: '请补充：' }));
-  const note = body.lastElementChild;
-  appendQuestions(note, result.questions);
-  result.questions.forEach((question, index) => {
-    const prior = state.answers.find((answer) => answer.question === question);
-    body.append(textAreaField(`followup-${index}`, `追问 ${index + 1}`, prior ? prior.answer : '', question));
   });
-  appendError(body, state.error);
+
   const footer = node('div', { className: 'panel-foot' });
-  footer.append(button('review-intake-again', state.busy ? '正在审查…' : '再次审查', () => {
-    const answers = result.questions.map((question, index) => ({
-      question,
-      answer: document.getElementById(`followup-${index}`).value.trim(),
-    }));
-    handlers.reviewAgain(answers);
-  }, { accent: true, disabled: state.busy }));
+  if (result.questions.length > 0) {
+    footer.append(button('review-intake-again', state.busy ? '正在审查…' : '再次审查', () => {
+      const answers = result.questions.map((question, index) => ({
+        question,
+        answer: document.getElementById(`followup-${index}`).value.trim(),
+      }));
+      handlers.reviewIntake(intakeValues(), answers);
+    }, { accent: true, disabled: state.busy }));
+  } else {
+    const submitLabel = result.sufficient
+      ? '继续类型判定'
+      : state.busy ? '正在审查…' : '审查信息';
+    footer.append(button('review-intake', submitLabel, () => {
+      handlers.reviewIntake(intakeValues());
+    }, { accent: true, disabled: state.busy }));
+  }
   panel.append(footer);
   root.replaceChildren(fragment);
 }
