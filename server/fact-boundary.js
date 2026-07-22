@@ -8,6 +8,12 @@ const FACT_BOUNDARY_CODES = Object.freeze({
 
 const DATE_PATTERN = /(?:20\d{2}[年./-]\d{1,2}(?:[月./-]\d{1,2}日?)?|\d{1,2}月\d{1,2}日)/g;
 const NUMBER_PATTERN = /(?:\d+(?:\.\d+)?(?:%|次|天|周|月|年|小时|分钟|人|项|个|分|元|周期)|百分之[零一二两三四五六七八九十百千万]+|[零一二两三四五六七八九十百千万]+(?:次|天|周|月|年|小时|分钟|人|项|个|分|元|周期))/g;
+const CHINESE_DIGITS = Object.freeze({
+  零: 0, 一: 1, 二: 2, 两: 2, 三: 3, 四: 4, 五: 5,
+  六: 6, 七: 7, 八: 8, 九: 9,
+});
+const CHINESE_UNITS = Object.freeze({ 十: 10, 百: 100, 千: 1000, 万: 10000 });
+const CHINESE_QUANTITY_PATTERN = /^([零一二两三四五六七八九十百千万]+)(次|天|周|月|年|小时|分钟|人|项|个|分|元|周期)$/;
 const SURNAME = '赵钱孙李周吴郑王冯陈褚卫蒋沈韩杨朱秦尤许何吕施张孔曹严华金魏陶姜谢邹苏潘葛范彭鲁韦马方任袁唐罗薛伍余姚孟顾尹江钟';
 const BARE_PERSON_SURNAME = SURNAME.replace('周', '');
 const PERSON_PATTERN = new RegExp(
@@ -41,9 +47,48 @@ function compact(value) {
   return String(value || '').replace(/\s+/g, '');
 }
 
-function missingTokens(pattern, generatedText, sourceText) {
-  const tokens = [...new Set(generatedText.match(pattern) || [])];
-  return tokens.filter((token) => !sourceText.includes(compact(token)));
+function parseChineseInteger(value) {
+  let total = 0;
+  let section = 0;
+  let number = 0;
+
+  for (const character of value) {
+    if (Object.hasOwn(CHINESE_DIGITS, character)) {
+      number = CHINESE_DIGITS[character];
+      continue;
+    }
+
+    const unit = CHINESE_UNITS[character];
+    if (unit === 10000) {
+      section += number;
+      total += section * unit;
+      section = 0;
+      number = 0;
+    } else {
+      section += (number || 1) * unit;
+      number = 0;
+    }
+  }
+
+  return total + section + number;
+}
+
+function normalizeNumberToken(token) {
+  const value = compact(token);
+  const percent = /^百分之([零一二两三四五六七八九十百千万]+)$/.exec(value);
+  if (percent) return `${parseChineseInteger(percent[1])}%`;
+
+  const quantity = CHINESE_QUANTITY_PATTERN.exec(value);
+  if (quantity) return `${parseChineseInteger(quantity[1])}${quantity[2]}`;
+  return value;
+}
+
+function missingTokens(pattern, generatedText, sourceText, normalizeToken = compact) {
+  const sourceTokens = new Set(
+    (sourceText.match(pattern) || []).map((token) => normalizeToken(token)),
+  );
+  const generatedTokens = [...new Set(generatedText.match(pattern) || [])];
+  return generatedTokens.filter((token) => !sourceTokens.has(normalizeToken(token)));
 }
 
 function findFactBoundaryIssues({ source, generated } = {}) {
@@ -54,7 +99,7 @@ function findFactBoundaryIssues({ source, generated } = {}) {
   if (missingTokens(DATE_PATTERN, generatedText, sourceText).length > 0) {
     issues.push(FACT_BOUNDARY_CODES.UNSUPPORTED_DATE);
   }
-  if (missingTokens(NUMBER_PATTERN, generatedText, sourceText).length > 0) {
+  if (missingTokens(NUMBER_PATTERN, generatedText, sourceText, normalizeNumberToken).length > 0) {
     issues.push(FACT_BOUNDARY_CODES.UNSUPPORTED_NUMBER);
   }
   if (missingTokens(PERSON_PATTERN, generatedText, sourceText).length > 0) {
