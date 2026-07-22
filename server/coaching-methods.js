@@ -9,7 +9,7 @@ const STAGE_LABELS = Object.freeze({
 });
 
 const LABEL_PATTERN = new RegExp(
-  `(?:^|[\\r\\n；;。！？!?])\\s*(?:[-+>]\\s*)?(?:[*_\`#]+\\s*)?(${Object.values(STAGE_LABELS).join('|')})(?:\\s*[*_\`#]+)?\\s*[：:]`,
+  `(?:^|[\\r\\n；;。])\\s*(?:[-+>]\\s*)?(?:[*_\`#]+\\s*)?(${Object.values(STAGE_LABELS).join('|')})(?:\\s*[*_\`#]+)?\\s*[：:]`,
   'g',
 );
 

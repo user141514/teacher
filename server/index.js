@@ -31,13 +31,12 @@ function resolveListenPort(value) {
   return value === 0 ? 0 : resolvePort(value);
 }
 
-function createDefaultCoachService({ fetchImpl, logger = console } = {}) {
+function createDefaultCoachService({ fetchImpl } = {}) {
   const rootDir = path.join(__dirname, '..');
   const promptLoader = createPromptLoader({ rootDir });
   const client = createDeepSeekClient({
     fetchImpl,
     apiKey: process.env.DEEPSEEK_API_KEY,
-    logger,
   });
 
   return createCoachService({ promptLoader, client });
