@@ -1,4 +1,16 @@
 const DEEPSEEK_URL = 'https://api.deepseek.com/chat/completions';
+const SAFE_DIAGNOSTIC_CODES = new Set([
+  'INVALID_SCHEMA',
+  'INVALID_GROW',
+  'MISSING_GAP_FIX_SBI',
+  'MISSING_SCRIPT_SBI',
+  'PLACEHOLDER_CONTENT',
+  'UNSUPPORTED_DATE',
+  'UNSUPPORTED_NUMBER',
+  'UNSUPPORTED_PERSON',
+  'UNSUPPORTED_RESULT',
+  'UNSUPPORTED_CAUSALITY',
+]);
 
 function controlledError(code) {
   const error = new Error(code);
@@ -16,7 +28,20 @@ function modelServiceUnavailable() {
   return controlledError('MODEL_SERVICE_UNAVAILABLE');
 }
 
-function createDeepSeekClient({ fetchImpl = globalThis.fetch, apiKey } = {}) {
+function safeDiagnosticCodes(issues) {
+  if (!Array.isArray(issues)) return [];
+  return [...new Set(issues.filter((code) => SAFE_DIAGNOSTIC_CODES.has(code)))];
+}
+
+function reportValidationFailure(logger, attempt, issues) {
+  if (!logger || typeof logger.warn !== 'function') return;
+  logger.warn('MODEL_RESPONSE_REJECTED', {
+    attempt: attempt + 1,
+    issues: issues.length > 0 ? issues : ['UNDIAGNOSED_MODEL_RESPONSE'],
+  });
+}
+
+function createDeepSeekClient({ fetchImpl = globalThis.fetch, apiKey, logger } = {}) {
   if (typeof fetchImpl !== 'function') {
     throw controlledError('MODEL_SERVICE_UNAVAILABLE');
   }
@@ -85,11 +110,12 @@ function createDeepSeekClient({ fetchImpl = globalThis.fetch, apiKey } = {}) {
         }
 
         if (!validate(parsed)) {
-          if (attempt === 0
-            && typeof diagnose === 'function'
-            && typeof buildRetryMessage === 'function') {
-            const issues = diagnose(parsed);
-            const retryMessage = buildRetryMessage(Array.isArray(issues) ? issues : []);
+          const issues = safeDiagnosticCodes(
+            typeof diagnose === 'function' ? diagnose(parsed) : [],
+          );
+          reportValidationFailure(logger, attempt, issues);
+          if (attempt === 0 && typeof buildRetryMessage === 'function') {
+            const retryMessage = buildRetryMessage(issues);
             if (typeof retryMessage === 'string' && retryMessage.trim() !== '') {
               attemptMessages = [
                 ...messages,

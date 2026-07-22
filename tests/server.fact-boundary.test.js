@@ -71,3 +71,22 @@ test('GROW SBI 结构标签不改变已知事实的来源判断', () => {
     generated: { behavior: 'Behavior（行为）：员工在周五主动同步了风险。' },
   }), []);
 });
+
+test('不把已有能力事实的已能或已经具备表达误判为既成结果', () => {
+  const source = {
+    ability: '员工能够独立完成复杂任务，交付质量稳定。',
+  };
+
+  assert.deepEqual(findFactBoundaryIssues({
+    source,
+    generated: {
+      reality: 'Reality（现状）：员工已能独立完成复杂任务。',
+      entry: '员工已经具备独立完成复杂任务的能力。',
+    },
+  }), []);
+
+  assert.deepEqual(findFactBoundaryIssues({
+    source,
+    generated: { result: '项目已经延期。' },
+  }), [FACT_BOUNDARY_CODES.UNSUPPORTED_RESULT]);
+});
