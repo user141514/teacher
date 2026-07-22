@@ -582,6 +582,21 @@ test('完整流程五页使用统一的参考视觉结构', async ({ page }) => 
   expect(requests.map(({ method }) => method)).toEqual(['intake', 'intake', 'classify', 'plan']);
 });
 
+test('四种公开画像提供固定简短判定摘要', async ({ page }) => {
+  await page.goto('/');
+  const summaries = await page.evaluate(async () => {
+    const { PUBLIC_PROFILES } = await import('/profile-selection.js');
+    return Object.fromEntries(PUBLIC_PROFILES.map(({ id, summary }) => [id, summary]));
+  });
+
+  expect(summaries).toEqual({
+    B: '员工能力较高，但近期主动性和投入度不足，归入熟手待激活型。辅导重点是激发意愿。',
+    A: '员工能力与意愿都较高，归入核心明星型。辅导重点是充分授权并提供更高挑战。',
+    C: '员工意愿较高，但当前能力或经验仍需提升，归入潜力新兵型。辅导重点是结构化带教。',
+    D: '员工当前能力与意愿都需要改善，归入待改进型。辅导重点是明确要求、边界与改进节奏。',
+  });
+});
+
 test('纯画像模块把 D1 D2 收敛为前台 D 并按入职时长解析隐藏类型', async ({ page }) => {
   await page.goto('/');
   const result = await page.evaluate(async () => {

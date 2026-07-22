@@ -1,8 +1,36 @@
 export const PUBLIC_PROFILES = Object.freeze([
-  Object.freeze({ id: 'B', ability: '高', will: '低', name: '熟手待激活型', description: '能力够、干得动，但主动性与投入度不足' }),
-  Object.freeze({ id: 'A', ability: '高', will: '高', name: '核心明星型', description: '能力强、意愿高，可授权与拔高' }),
-  Object.freeze({ id: 'C', ability: '低', will: '高', name: '潜力新兵型', description: '意愿足但经验不足，需带教补能力' }),
-  Object.freeze({ id: 'D', ability: '低', will: '低', name: '待改进型', description: '能力与意愿双低，需明确要求与边界' }),
+  Object.freeze({
+    id: 'B',
+    ability: '高',
+    will: '低',
+    name: '熟手待激活型',
+    description: '能力够、干得动，但主动性与投入度不足',
+    summary: '员工能力较高，但近期主动性和投入度不足，归入熟手待激活型。辅导重点是激发意愿。',
+  }),
+  Object.freeze({
+    id: 'A',
+    ability: '高',
+    will: '高',
+    name: '核心明星型',
+    description: '能力强、意愿高，可授权与拔高',
+    summary: '员工能力与意愿都较高，归入核心明星型。辅导重点是充分授权并提供更高挑战。',
+  }),
+  Object.freeze({
+    id: 'C',
+    ability: '低',
+    will: '高',
+    name: '潜力新兵型',
+    description: '意愿足但经验不足，需带教补能力',
+    summary: '员工意愿较高，但当前能力或经验仍需提升，归入潜力新兵型。辅导重点是结构化带教。',
+  }),
+  Object.freeze({
+    id: 'D',
+    ability: '低',
+    will: '低',
+    name: '待改进型',
+    description: '能力与意愿双低，需明确要求与边界',
+    summary: '员工当前能力与意愿都需要改善，归入待改进型。辅导重点是明确要求、边界与改进节奏。',
+  }),
 ]);
 
 const INTERNAL_COACHING = Object.freeze({
