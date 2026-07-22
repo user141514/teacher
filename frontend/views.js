@@ -412,7 +412,9 @@ function markdownCard(parent, id, title, source, options = {}) {
   heading.append(document.createTextNode(title));
   card.append(heading);
   const content = node('div', { id });
-  const markdown = normalizeMarkdownSource(source);
+  const markdown = options.standardList && Array.isArray(source)
+    ? source.map((item) => `- ${item}`).join('\n')
+    : normalizeMarkdownSource(source);
   window.renderMarkdown(
     content,
     options.separateCoachingStages ? formatCoachingStageMarkdown(markdown) : markdown,
@@ -738,15 +740,23 @@ function renderPlan(root, state, handlers) {
     handlers,
   );
   const report = node('div', { className: 'report', id: 'coach-plan' });
-  markdownCard(report, 'plan-entry', '沟通切入点', state.plan.entry, { marker: '切' });
-  markdownCard(report, 'plan-cautions', '沟通注意事项', state.plan.cautions, { marker: '注' });
+  markdownCard(report, 'plan-entry', '沟通切入点', state.plan.entry, { marker: '切', standardList: true });
+  markdownCard(report, 'plan-cautions', '沟通注意事项', state.plan.cautions, { marker: '注', standardList: true });
   const frequency = node('section', { className: 'rcard' });
   const frequencyHeading = node('h3', { className: 'rcard-h' });
   frequencyHeading.append(node('span', { className: 'n', text: '频' }), document.createTextNode('建议沟通频率'));
   frequency.append(frequencyHeading, node('p', { id: 'plan-frequency', text: state.plan.frequency || '' }));
   report.append(frequency);
-  markdownCard(report, 'plan-gap-fix', '绩效差距修正方法', state.plan.gap_fix, { marker: '修', separateCoachingStages: true });
-  markdownCard(report, 'plan-scripts', '话术示例', state.plan.scripts, { marker: '话', separateCoachingStages: true });
+  markdownCard(report, 'plan-gap-fix', '绩效差距修正方法', state.plan.gap_fix, {
+    marker: '修',
+    separateCoachingStages: true,
+    standardList: true,
+  });
+  markdownCard(report, 'plan-scripts', '话术示例', state.plan.scripts, {
+    marker: '话',
+    separateCoachingStages: true,
+    standardList: true,
+  });
   body.append(report);
   appendError(body, state.error);
   const footer = createPanelFooter();

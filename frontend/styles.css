@@ -328,6 +328,15 @@
   margin-top: 5px;
 }
 
+.panel[data-stage="plan"] .rcard .markdown-body ul {
+  padding-left: 1.4rem;
+  list-style-type: disc;
+}
+
+.panel[data-stage="plan"] .rcard .markdown-body ul > li::marker {
+  color: var(--purple);
+}
+
 .classification-reason-title {
   margin: 0 0 5px;
 }

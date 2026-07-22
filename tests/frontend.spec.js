@@ -477,6 +477,27 @@ test('桌面方案页对齐五类卡片标题图标和参考操作栏', async ({
   await expectRectNear(cards.first().locator('.rcard-h .n'), { x: 736, y: 311.5625, width: 24, height: 24 });
 });
 
+test('桌面方案页仅为标准无序列表显示紫色圆点', async ({ page }) => {
+  await page.setViewportSize({ width: 1920, height: 1080 });
+  await advanceToPlan(page);
+
+  const listItems = page.locator(
+    '.panel[data-stage="plan"] .rcard .markdown-body ul > li',
+  );
+  await expect(listItems).not.toHaveCount(0);
+
+  const markerStyles = await listItems.evaluateAll((items) => items.map((item) => ({
+    listStyleType: getComputedStyle(item).listStyleType,
+    markerColor: getComputedStyle(item, '::marker').color,
+  })));
+  expect(markerStyles.every(({ listStyleType }) => listStyleType === 'disc')).toBe(true);
+  expect(markerStyles.every(({ markerColor }) => markerColor === 'rgb(108, 33, 109)')).toBe(true);
+
+  await expect(page.locator('#plan-frequency')).toHaveCount(1);
+  await expect(page.locator('#plan-frequency').locator('ul, li')).toHaveCount(0);
+  await expect(page.locator('#plan-scripts li').first().locator('p')).not.toHaveCount(0);
+});
+
 test('桌面完整 GROW SBI 内容在面板内滚动且底部操作栏保持可见', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
   await advanceToPlan(page);
