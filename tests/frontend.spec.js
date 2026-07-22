@@ -479,7 +479,15 @@ test('桌面方案页对齐五类卡片标题图标和参考操作栏', async ({
 
 test('桌面方案页仅为标准无序列表显示紫色圆点', async ({ page }) => {
   await page.setViewportSize({ width: 1920, height: 1080 });
-  await advanceToPlan(page);
+  const fixtures = defaultFixtures();
+  fixtures.plan = [envelope({
+    entry: ['- 先认可其交付能力', '- 再约定挑战目标'],
+    cautions: ['- 避免把跟进变成查岗'],
+    frequency: '每周一次 1v1（15 分钟）',
+    gap_fix: ['- **Situation（情境）**：项目例会；**Behavior（行为）**：主动同步风险；**Impact（影响）**：团队可以提前协调。'],
+    scripts: ['- **Goal（目标）**：主动推进项目同步。**Reality（现状）**：目前仍需主管跟进。**Options（可选方案）**：可用模板或日历提醒。**Will（行动承诺）**：下次评审前主动同步。'],
+  })];
+  await advanceToPlan(page, fixtures);
 
   const listItems = page.locator(
     '.panel[data-stage="plan"] .rcard .markdown-body ul > li',
