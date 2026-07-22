@@ -436,8 +436,14 @@ test('桌面类型判定页对齐参考提示、四画像、依据和操作栏',
     await expect(page.locator('.panel[data-stage="classification"]'))
       .not.toContainText(hiddenLabel);
   }
-  await expect(page.locator('.classification-reasoning')).toContainText('判定依据：');
-  await expect(page.locator('.classification-reasoning')).toContainText('员工已能独立交付复杂任务');
+  const reasoning = page.locator('.classification-reasoning');
+  await expect(reasoning.locator('.classification-reason-title')).toHaveCount(0);
+  await expect(reasoning.locator('.classification-evidence')).toHaveCount(0);
+  await expect(reasoning.locator('p')).toHaveCount(1);
+  await expect(reasoning).toHaveText(
+    '判定依据：员工能力较高，但近期主动性和投入度不足，归入熟手待激活型。辅导重点是激发意愿。',
+  );
+  await expect(reasoning).not.toContainText('员工已能独立交付复杂任务');
 
   await expect(page.locator('#go-previous')).toHaveText('上一步');
   await expect(page.locator('#generate-plan')).toHaveText('生成方案');
@@ -653,8 +659,15 @@ test('AI 推荐默认选中且用户可无 API 改选画像', async ({ page }) =
   await expect(page.getByText(/D1|D2/)).toHaveCount(0);
   await expect(page.locator('[data-profile-id="B"]')).toHaveClass(/selected/);
   await expect(page.locator('[data-profile-id="B"]')).toContainText('最匹配');
+  const summary = page.locator('.classification-summary');
+  await expect(summary).toHaveText(
+    '判定依据：员工能力较高，但近期主动性和投入度不足，归入熟手待激活型。辅导重点是激发意愿。',
+  );
 
   await page.locator('[data-profile-id="A"]').click();
+  await expect(summary).toHaveText(
+    '判定依据：员工能力与意愿都较高，归入核心明星型。辅导重点是充分授权并提供更高挑战。',
+  );
   await expect(page.locator('[data-profile-id="A"]')).toHaveClass(/selected/);
   await expect(page.locator('[data-profile-id="A"]')).toContainText('已选');
   await expect(page.locator('[data-profile-id="B"]')).toContainText('AI推荐');
@@ -1025,6 +1038,10 @@ for (const status of ['待补充', '待人工确认']) {
     await expect(page.getByRole('radiogroup', { name: '员工画像选择' })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /方案/ })).toHaveCount(0);
     await expect(page.getByRole('button', { name: /补充|人工确认/ })).toBeVisible();
+    await expect(page.locator('.classification-summary')).toHaveCount(0);
+    await expect(page.locator('.classification-reason-title')).toHaveCount(1);
+    await expect(page.locator('.classification-reasoning')).toContainText(pending.reason);
+    await expect(page.locator('.classification-questions')).toBeVisible();
     expect(requests.filter(({ method }) => method === 'plan')).toHaveLength(0);
   });
 }
@@ -1373,8 +1390,11 @@ test('类型判定隐藏内部判定行但保留画像选择和具体依据', as
     await expect(page.locator('.panel[data-stage="classification"]'))
       .not.toContainText(hiddenLabel);
   }
-  await expect(page.locator('.classification-reasoning')).toContainText('判定依据：');
-  await expect(page.locator('.classification-reasoning')).toContainText('员工已能独立交付复杂任务');
+  await expect(page.locator('.classification-reasoning')).toHaveText(
+    '判定依据：员工能力较高，但近期主动性和投入度不足，归入熟手待激活型。辅导重点是激发意愿。',
+  );
+  await expect(page.locator('.classification-reason-title')).toHaveCount(0);
+  await expect(page.locator('.classification-evidence')).toHaveCount(0);
   await expect(page.locator('.typegrid .tcard')).toHaveCount(4);
   await expect(page.locator('#generate-plan')).toBeVisible();
   await expect(page.getByText('置信度：', { exact: true })).toHaveCount(0);

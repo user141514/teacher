@@ -625,7 +625,7 @@ function renderClassification(root, state, handlers) {
     return;
   }
 
-  let finalClassification = classification;
+  let selectedProfile = null;
   if (classification.status !== '已判定') {
     body.append(node('div', {
       className: 'note classification-status',
@@ -644,6 +644,7 @@ function renderClassification(root, state, handlers) {
     typeGrid.setAttribute('aria-label', '员工画像选择');
     const aiProfileId = publicProfileId(classification.type_id);
     const selectedProfileId = state.selectedProfileId || aiProfileId;
+    selectedProfile = PUBLIC_PROFILES.find(({ id }) => id === selectedProfileId) || null;
 
     for (const profile of PUBLIC_PROFILES) {
       const card = button(
@@ -674,39 +675,43 @@ function renderClassification(root, state, handlers) {
       typeGrid.append(card);
     }
     body.append(typeGrid);
-    finalClassification = resolveFinalClassification(
-      classification,
-      selectedProfileId,
-      state.intake,
-    );
   }
 
   const details = node('section', { className: 'rcard classification-details' });
   const reasoning = node('div', { className: 'reasoning classification-reasoning' });
-  reasoning.append(
-    node('h3', { className: 'rcard-h classification-reason-title', text: CLASSIFICATION_LABELS.reason }),
-    (() => {
-      const reason = node('p');
-      reason.append(
-        node('strong', { text: '判定依据：' }),
-        document.createTextNode(finalClassification.reason || '未提供'),
-      );
-      return reason;
-    })(),
-  );
-  if (Array.isArray(classification.evidence) && classification.evidence.length > 0) {
-    const evidence = node('p', { className: 'classification-evidence' });
-    evidence.append(
-      node('strong', { text: '判定证据：' }),
-      document.createTextNode(classification.evidence.join('；')),
+  if (classification.status === '已判定' && selectedProfile) {
+    const summary = node('p', { className: 'classification-summary' });
+    summary.append(
+      node('strong', { text: '判定依据：' }),
+      document.createTextNode(selectedProfile.summary),
     );
-    reasoning.append(evidence);
-  }
-  if (classification.questions.length > 0) {
-    const questions = node('div', { className: 'classification-questions' });
-    questions.append(node('h3', { className: 'rcard-h', text: '仍需确认' }));
-    appendQuestions(questions, classification.questions);
-    reasoning.append(questions);
+    reasoning.append(summary);
+  } else {
+    reasoning.append(
+      node('h3', { className: 'rcard-h classification-reason-title', text: CLASSIFICATION_LABELS.reason }),
+      (() => {
+        const reason = node('p');
+        reason.append(
+          node('strong', { text: '判定依据：' }),
+          document.createTextNode(classification.reason || '未提供'),
+        );
+        return reason;
+      })(),
+    );
+    if (Array.isArray(classification.evidence) && classification.evidence.length > 0) {
+      const evidence = node('p', { className: 'classification-evidence' });
+      evidence.append(
+        node('strong', { text: '判定证据：' }),
+        document.createTextNode(classification.evidence.join('；')),
+      );
+      reasoning.append(evidence);
+    }
+    if (classification.questions.length > 0) {
+      const questions = node('div', { className: 'classification-questions' });
+      questions.append(node('h3', { className: 'rcard-h', text: '仍需确认' }));
+      appendQuestions(questions, classification.questions);
+      reasoning.append(questions);
+    }
   }
   details.append(reasoning);
   body.append(details);
