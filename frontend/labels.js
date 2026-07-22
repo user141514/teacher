@@ -1,10 +1,9 @@
 export const TYPE_LABELS = Object.freeze({
-  A: '核心明星型',
-  B: '熟手待激活型',
-  C: '潜力新兵型',
-  D: '待改进型',
-  D1: '待改进型',
-  D2: '待改进型',
+  A: '高能力高意愿型',
+  B: '成熟待激活型',
+  C: '成长发展型',
+  D1: '新入职适应型',
+  D2: '绩效改进支持型',
 });
 
 export const CLASSIFICATION_LABELS = Object.freeze({

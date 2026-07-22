@@ -7,35 +7,14 @@ param(
 $ErrorActionPreference = 'Stop'
 $OutputEncoding = [Console]::OutputEncoding = [System.Text.UTF8Encoding]::new($false)
 $projectRoot = (Resolve-Path -LiteralPath (Join-Path $PSScriptRoot '..')).Path
+$serviceUrl = 'http://127.0.0.1:4173/'
+$healthUrl = 'http://127.0.0.1:4173/api/health'
 
 function Stop-WithMessage {
   param([string]$Message)
 
   Write-Output $Message
   exit 1
-}
-
-function Get-ServicePort {
-  $rawPort = & $nodeCommand.Source '--env-file=.env' '-p' 'process.env.PORT ?? 4173'
-  if ($LASTEXITCODE -ne 0) {
-    Stop-WithMessage '无法读取 .env 中的 PORT 配置。'
-  }
-
-  [int]$parsedPort = 0
-  if (-not [int]::TryParse(([string]$rawPort).Trim(), [ref]$parsedPort) `
-    -or $parsedPort -lt 1 `
-    -or $parsedPort -gt 65535) {
-    Stop-WithMessage 'PORT 配置无效，请填写 1 至 65535 的整数。'
-  }
-
-  return $parsedPort
-}
-
-function Test-PortInUse {
-  param([int]$Port)
-
-  $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
-  return $null -ne ($listeners | Where-Object { $_.Port -eq $Port } | Select-Object -First 1)
 }
 
 function Test-HealthyService {
@@ -73,59 +52,37 @@ try {
     Stop-WithMessage '缺少 node_modules。请先运行 npm.cmd install 安装依赖。'
   }
 
-  $servicePort = Get-ServicePort
-  $serviceUrl = "http://127.0.0.1:$servicePort/"
-  $healthUrl = "${serviceUrl}api/health"
-
-  if (Test-PortInUse -Port $servicePort) {
-    Stop-WithMessage "端口 $servicePort 已被占用，未启动服务。请先关闭占用程序或修改 .env 中的 PORT。"
-  }
-
   if ($CheckOnly) {
     Write-Output '环境检查通过，未启动服务。'
     exit 0
   }
 
-  $serviceProcess = $null
-  try {
-    try {
-      $serviceProcess = Start-Process `
-        -FilePath $nodeCommand.Source `
-        -ArgumentList @('--env-file=.env', 'server/index.js') `
-        -WorkingDirectory $projectRoot `
-        -NoNewWindow `
-        -PassThru
-    } catch {
-      Stop-WithMessage '服务启动失败。请检查 Node.js 安装和项目依赖后重试。'
-    }
-
-    $deadline = (Get-Date).AddSeconds(20)
-    $healthy = $false
-    while ((Get-Date) -lt $deadline) {
-      Start-Sleep -Milliseconds 500
-      if (Test-HealthyService) {
-        $healthy = $true
-        break
-      }
-      if ($serviceProcess.HasExited) {
-        break
-      }
-    }
-
-    if (-not $healthy) {
-      Stop-WithMessage '服务启动失败，20 秒内未通过健康检查。请检查终端输出后重试。'
-    }
-
-    Write-Output "服务已启动：$serviceUrl"
+  if (Test-HealthyService) {
+    Write-Output '服务已在运行，复用现有服务。'
     Open-ServiceInBrowser
-    $serviceProcess.WaitForExit()
-    exit $serviceProcess.ExitCode
-  } finally {
-    if ($serviceProcess -and -not $serviceProcess.HasExited) {
-      Stop-Process -Id $serviceProcess.Id -Force -ErrorAction SilentlyContinue
-      [void]$serviceProcess.WaitForExit(5000)
+    exit 0
+  }
+
+  try {
+    $process = Start-Process -FilePath $nodeCommand.Source -ArgumentList @('--env-file=.env', 'server/index.js') -WorkingDirectory $projectRoot -WindowStyle Hidden -PassThru
+  } catch {
+    Stop-WithMessage '服务启动失败。请检查 Node.js 安装和项目依赖后重试。'
+  }
+
+  $deadline = (Get-Date).AddSeconds(20)
+  while ((Get-Date) -lt $deadline) {
+    Start-Sleep -Milliseconds 500
+    if (Test-HealthyService) {
+      Write-Output '服务已启动。'
+      Open-ServiceInBrowser
+      exit 0
+    }
+    if ($process.HasExited) {
+      break
     }
   }
+
+  Stop-WithMessage '服务启动失败，20 秒内未通过健康检查。请检查终端输出后重试。'
 } finally {
   Pop-Location
 }

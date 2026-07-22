@@ -53,27 +53,6 @@ function classified() {
   });
 }
 
-function classifiedAs(typeId, overrides = {}) {
-  const base = {
-    D1: { strategy: '手把手带', coach_mode: '教导式' },
-    D2: { strategy: '绩效改进/优化', coach_mode: '绩效面谈' },
-  }[typeId];
-  return envelope({
-    ability: '低',
-    will: '低',
-    quadrant: 'D',
-    type_id: typeId,
-    status: '已判定',
-    classification_confidence: '中',
-    strategy: base.strategy,
-    coach_mode: base.coach_mode,
-    reason: '能力和意愿证据均偏低。',
-    evidence: ['任务尚不能独立完成', '投入意愿不足'],
-    questions: [],
-    ...overrides,
-  });
-}
-
 function coachingPlan() {
   return envelope({
     entry: ['**先认可**其交付能力，再约定挑战目标。'],
@@ -119,7 +98,6 @@ function defaultFixtures() {
 
 module.exports = {
   coachingPlan,
-  classifiedAs,
   defaultFixtures,
   envelope,
   nextPlan,

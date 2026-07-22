@@ -295,54 +295,16 @@ function validateClassification(payload) {
     && validateClassificationSemantics(payload, 'classification_confidence');
 }
 
-const PLAN_VALIDATION_CODES = Object.freeze({
-  INVALID_SCHEMA: 'INVALID_SCHEMA',
-  INVALID_GROW: 'INVALID_GROW',
-  MISSING_GAP_FIX_SBI: 'MISSING_GAP_FIX_SBI',
-  MISSING_SCRIPT_SBI: 'MISSING_SCRIPT_SBI',
-  PLACEHOLDER_CONTENT: 'PLACEHOLDER_CONTENT',
-});
-
-const PLAN_PLACEHOLDER_PATTERN = /(?:XX(?:项目|模块)|X月X日|某员工|某任务)/i;
-
-function containsPlanPlaceholder(payload) {
-  const values = [
-    ...payload.entry,
-    ...payload.cautions,
-    payload.frequency,
-    ...payload.gap_fix,
-    ...payload.scripts,
-  ];
-  return values.some((value) => PLAN_PLACEHOLDER_PATTERN.test(value));
-}
-
-function findPlanValidationIssues(payload, { typeId } = {}) {
-  if (!validatePlanSchema(payload)) {
-    return [PLAN_VALIDATION_CODES.INVALID_SCHEMA];
-  }
-
-  const issues = [];
-  if (!hasCompleteGrowScripts(payload.scripts)) {
-    issues.push(PLAN_VALIDATION_CODES.INVALID_GROW);
+function validatePlan(payload, { typeId } = {}) {
+  if (!validatePlanSchema(payload) || !hasCompleteGrowScripts(payload.scripts)) {
+    return false;
   }
 
   if (typeId === 'B' || typeId === 'D2') {
-    if (!payload.gap_fix.some(hasCompleteSbi)) {
-      issues.push(PLAN_VALIDATION_CODES.MISSING_GAP_FIX_SBI);
-    }
-    if (!payload.scripts.some(hasCompleteSbi)) {
-      issues.push(PLAN_VALIDATION_CODES.MISSING_SCRIPT_SBI);
-    }
+    return payload.gap_fix.some(hasCompleteSbi) && payload.scripts.some(hasCompleteSbi);
   }
 
-  if (containsPlanPlaceholder(payload)) {
-    issues.push(PLAN_VALIDATION_CODES.PLACEHOLDER_CONTENT);
-  }
-  return issues;
-}
-
-function validatePlan(payload, { typeId } = {}) {
-  return findPlanValidationIssues(payload, { typeId }).length === 0;
+  return true;
 }
 
 function validateFeedback(payload, { requireSbi = false } = {}) {
@@ -351,7 +313,6 @@ function validateFeedback(payload, { requireSbi = false } = {}) {
 }
 
 module.exports = {
-  PLAN_VALIDATION_CODES,
   intakeResponse,
   modelClassificationResponse,
   classificationResponse,
@@ -362,7 +323,6 @@ module.exports = {
   validateIntake,
   validateModelClassification,
   validateClassification,
-  findPlanValidationIssues,
   validatePlan,
   validatePlanStop,
   validateFeedback,

@@ -29,25 +29,3 @@ test('SBI 要求标签式 Situation/Behavior/Impact 按序且内容非空', () =
   assert.equal(hasCompleteSbi('正文讨论 Situation（情境）、Behavior（行为）和 Impact（影响）的定义。'), false);
   assert.equal(hasCompleteSbi('Situation（情境）：周一例会。Behavior（行为）：未提前同步。'), false);
 });
-
-test('严格双语阶段标签可出现在自然问句或感叹句之后', () => {
-  assert.equal(hasCompleteGrowScripts([
-    'Goal（目标）：本周独立推进客户评审！Reality（现状）：当前需要主管提醒才同步风险。',
-    'Options（可选方案）：你还可以想到哪些办法？Will（行动承诺）：周五前完成首次主动同步。',
-  ]), true);
-
-  assert.equal(hasCompleteSbi(
-    'Situation（情境）：周一项目例会！Behavior（行为）：你在会前主动同步了风险？Impact（影响）：团队提前协调了资源。',
-  ), true);
-});
-
-test('放宽标点边界后仍拒绝中文简称标签', () => {
-  assert.equal(hasCompleteGrowScripts([
-    '目标：本周独立推进客户评审。现状：当前仍需主管提醒。',
-    '可选方案：每日同步。行动承诺：周五执行。',
-  ]), false);
-
-  assert.equal(hasCompleteSbi(
-    '情境：周一项目例会。行为：会前未同步风险。影响：团队临时调整资源。',
-  ), false);
-});

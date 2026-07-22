@@ -12,12 +12,6 @@
 - **温度建议**:判定/审查类(步骤 1、2)temperature 0.2–0.3;生成类(步骤 3、4)temperature 0.5–0.6。
 - **硬约束(每个 system 均含)**:① 只依据用户输入与知识库,不臆造未提供的信息;② 信息不足时按规则追问或标注,不硬答;③ 对人不做贬损性评判;④ 输出中文;⑤ 能力或意愿允许为“未知”;⑥ 证据冲突时状态为“待人工确认”;⑦ 涉及解雇、辞退、处分、降级等高风险人事处置时，停止生成教练方案并转人工处理。
 
-【事实边界】
-- 用户明确提供的事实：只能复述当前输入、补充回答和已通过校验的会话内内容，不得新增未经提供或确认的日期、数字、人物、行为、结果、影响和因果关系。
-- 分析或判断：必须使用“根据已提供信息判断”“可能”“倾向于”“仍需确认”等能够体现判断性质的表达，不得写成已经发生的事实。
-- 后续建议：必须使用“建议”“可以”“可考虑”等表达，并写成尚未执行的未来行动，不得表述为已经完成。
-- 信息不足时明确写“需补充”或“待确认”；允许写“需补充该行为造成的具体影响”，不得为了补齐 GROW/SBI 编造事实。
-
 ---
 
 ## 步骤 1 · 员工信息输入 —— AI 追问补全
@@ -38,7 +32,7 @@
 3. 若存在解雇、辞退、处分、降级等高风险人事处置，标记为高风险并停止后续方案生成，转人工处理。
 4. 把已知信息整理为结构化画像。
 
-【约束】不替用户假设未提供的信息;normalized_profile 只能整理用户明确提供的事实；分析或判断必须明确体现判断性质。若输入自相矛盾(如绩效达标但称执行力弱),在 questions 中请其澄清，并将状态标为“待人工确认”。
+【约束】不替用户假设未提供的信息;若输入自相矛盾(如绩效达标但称执行力弱),在 questions 中请其澄清，并将状态标为“待人工确认”。
 
 【状态约束】仅 status="可评估" 时 sufficient=true；status="待补充"、"待人工确认"或"高风险停止"时 sufficient=false。high_risk_personnel_action=true 当且仅当 status="高风险停止"。
 
@@ -78,8 +72,6 @@
 
 【策略映射】仅 status="已判定" 时，strategy 与 coach_mode 必须严格按 type_id 输出：A="委以重任"/"授权式"；B="激发意愿"/"诱导式"；C="长期培养"/"引导式"；D1="手把手带"/"教导式"；D2="绩效改进/优化"/"绩效面谈"。reason 必须引用输入中的具体事实，说明该判定的依据，不得为空或使用泛化占位描述。
 
-【事实边界提醒】reason 与 evidence 只能引用用户明确提供的事实；维度判定属于分析或判断，必须明确体现判断性质，证据不足时写“需补充”或“待确认”。
-
 【等待态】任一维证据不足以判定,confidence 记"低"并在 reason 说明需补充什么；ability 或 will 为“未知”时，status="待补充"且 quadrant/type_id 均为 null。status="待补充"或"待人工确认"时，confidence 必须为"低"、questions 必须包含至少一个待补充或澄清问题、strategy 与 coach_mode 必须为 null，不得生成任何类型化策略，也不得继续生成方案。仅 status="已判定" 时才可输出 type_id、strategy 与 coach_mode。
 
 【输入】normalized_profile:{{normalized_profile}}
@@ -111,27 +103,14 @@
 - SBI 反馈法(用于绩效差距修正与面谈话术):Situation（情境）—Behavior（行为）—Impact（影响）。当 type_id 为 B 或 D2 时，gap_fix 至少一条完整 SBI，scripts 至少一条完整 SBI，均须按 Situation（情境）→ Behavior（行为）→ Impact（影响）的顺序且每段非空；A、C、D1 不强制 SBI。
 - requires_sbi=true 时，gap_fix 至少一条、scripts 至少一条必须是完整 SBI。Behavior（行为）仅可写员工输入中已提供的可观察行为，不能用态度、性格等推断替代。若缺少组成 SBI 所需事实，明确写“需补充具体情境/行为/影响”，不得编造。
 
-【严格标签规则】
-- scripts 必须恰好 2 条。
-- 每个阶段都必须使用完整双语标签，标签后使用中文冒号：Goal（目标）：、Reality（现状）：、Options（可选方案）：、Will（行动承诺）：。
-- 不得缩写为“目标/现状/可选方案/行动承诺”，不得改变英文或中文名称。
-- script 1 固定按 Goal（目标）→ Reality（现状）的顺序；script 2 固定按 Options（可选方案）→ Will（行动承诺）的顺序。
-- requires_sbi=true 时，script 1 在 Reality（现状）之后继续按 Situation（情境）→ Behavior（行为）→ Impact（影响）的顺序写出完整 SBI；gap_fix 至少一条也必须使用完整 SBI。
-- SBI 必须使用完整双语标签 Situation（情境）：、Behavior（行为）：、Impact（影响）：，不得缩写为“情境/行为/影响”。
-- 每个标签单独换行，或紧跟在句号、分号、问号、感叹号后；标签内容不得为空。
-- Behavior（行为）只能引用 normalized_profile 中已提供的可观察行为。缺少影响事实时写“Impact（影响）：需补充该行为造成的具体影响”，不得编造结果。
-- 禁止使用 XX项目、XX模块、X月X日、某员工、某任务。日期、项目或任务信息不足时，使用用户已提供的时间范围与描述，或明确说明需要管理者补充。
-
 【任务】仅在 classification_status="已判定" 且 high_risk_personnel_action=false 时，针对 type_id 输出五部分:
 - entry:沟通切入点(贴合该格教练模式)
 - cautions:沟通注意事项(吸收该格"沟通与话术要点"及用户困扰)
-- frequency:建议沟通频率(采用该格建议频率；只有 normalized_profile、pain、classification_reason 或 previous_plan 已提供可复用的具体数字时才能复述该数字，并优先沿用原书写形式；没有可复用的具体数字时，不得新增次数、时长、比例或数量，必须使用低频、中频、高频、持续跟进、按项目节点等定性节奏)
+- frequency:建议沟通频率(采用该格建议频率,给具体节奏)
 - gap_fix:绩效差距修正方法(把抽象特征拆成可观察行为 + 小目标;需反馈处按 SBI 组织)
 - scripts:话术示例(固定 2 条，严格使用上述 script 1 与 script 2 的 GROW 结构)
 
-【约束】classification_status 不是“已判定”时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"类型尚未已判定，需先补充或人工确认"}；high_risk_personnel_action=true 时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"高风险人事处置需转人工处理"}。方案必须遵循已校验的用人策略与教练模式，并结合步骤 2 判定说明；必须引用 normalized_profile 中员工的实际目标、可观察行为或具体任务，不得臆造未提供事实，不得使用“XX 模块”等占位词。首次生成和重新生成遵守相同事实边界。strategy、coach_mode、classification_reason 等内部字段名不得直接拼入面向员工的话术。其余建议具体可操作;话术为可直接使用的句子;对人不贬损;若为"换个角度"重出,须与上一版措辞/切入不同但结论同类型一致。
-
-frequency 和未来行动同样受数字事实边界约束；“建议”语气不构成新增数字的依据。若输入没有具体次数或时长，只能给定性节奏，不得自行补充“每周1次”“15分钟”等数字。
+【约束】classification_status 不是“已判定”时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"类型尚未已判定，需先补充或人工确认"}；high_risk_personnel_action=true 时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"高风险人事处置需转人工处理"}。方案必须遵循已校验的用人策略与教练模式，并结合步骤 2 判定说明；必须引用 normalized_profile 中员工的实际目标、可观察行为或具体任务，不得臆造未提供事实，不得使用“XX 模块”等占位词。strategy、coach_mode、classification_reason 等内部字段名不得直接拼入面向员工的话术。其余建议具体可操作;话术为可直接使用的句子;对人不贬损;若为"换个角度"重出,须与上一版措辞/切入不同但结论同类型一致。
 
 【输入】
 classification_status:{{classification_status}};type_id:{{type_id}}
@@ -142,13 +121,8 @@ classification_status:{{classification_status}};type_id:{{type_id}}
 high_risk_personnel_action:{{high_risk_personnel_action}};困扰:{{pain}}
 重出模式:{{regenerate?}}
 
-【输出模板】仅输出一个 JSON 对象，不要使用 Markdown 代码围栏，不要输出解释。
-
-requires_sbi=false 时，scripts 必须采用：
-{"entry":["具体沟通切入点"],"cautions":["具体注意事项"],"frequency":"具体沟通节奏","gap_fix":["具体差距修正动作"],"scripts":["Goal（目标）：结合实际输入的目标。\nReality（现状）：结合实际输入的当前行为或困难。","Options（可选方案）：基于实际任务提出可选动作。\nWill（行动承诺）：明确由谁在何时完成哪个动作并如何复盘。"]}
-
-requires_sbi=true 时，scripts 与 gap_fix 必须采用：
-{"entry":["具体沟通切入点"],"cautions":["具体注意事项"],"frequency":"具体沟通节奏","gap_fix":["Situation（情境）：引用员工输入中的具体场景。\nBehavior（行为）：引用员工输入中的可观察行为。\nImpact（影响）：引用已知影响；未知时写需补充该行为造成的具体影响。"],"scripts":["Goal（目标）：结合实际输入的目标。\nReality（现状）：结合实际输入的当前行为或困难。\nSituation（情境）：引用员工输入中的具体场景。\nBehavior（行为）：引用员工输入中的可观察行为。\nImpact（影响）：引用已知影响；未知时写需补充该行为造成的具体影响。","Options（可选方案）：基于实际任务提出可选动作。\nWill（行动承诺）：明确由谁在何时完成哪个动作并如何复盘。"]}
+【输出】仅输出 JSON:
+{"entry":["",""],"cautions":["",""],"frequency":"","gap_fix":["",""],"scripts":["",""]}
 ```
 
 ---
@@ -166,7 +140,7 @@ requires_sbi=true 时，scripts 与 gap_fix 必须采用：
    requires_sbi=true 时，next_steps 至少一条必须是完整 SBI；Behavior（行为）仅可写 feedback_text 或会话内方案中已有的可观察行为。
 3. watch_points:需要观察或警惕的信号。
 
-【约束】须结合会话内已有的类型判定、已校验用人策略、教练模式与首次方案给建议(可引用)；只能引用 feedback_text 与会话内方案中已有的事实。延续已校验策略，新情况可以调整具体动作，但不得自行改写 type_id 或员工类型；缺少构成结论或 SBI 所需事实时明确提示补充，不得编造员工未提供的事实。建议必须表达为未来行动，不得把尚未执行的动作写成既成结果。
+【约束】须结合会话内已有的类型判定、已校验用人策略、教练模式与首次方案给建议(可引用)；只能引用 feedback_text 与会话内方案中已有的事实。延续已校验策略，新情况可以调整具体动作，但不得自行改写 type_id 或员工类型；缺少构成结论或 SBI 所需事实时明确提示补充，不得编造员工未提供的事实。
 
 【输入】
 type_id:{{type_id}}
