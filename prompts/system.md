@@ -125,11 +125,13 @@
 【任务】仅在 classification_status="已判定" 且 high_risk_personnel_action=false 时，针对 type_id 输出五部分:
 - entry:沟通切入点(贴合该格教练模式)
 - cautions:沟通注意事项(吸收该格"沟通与话术要点"及用户困扰)
-- frequency:建议沟通频率(采用该格建议频率,给具体节奏)
+- frequency:建议沟通频率(采用该格建议频率；只有 normalized_profile、pain、classification_reason 或 previous_plan 已提供可复用的具体数字时才能复述该数字，并优先沿用原书写形式；没有可复用的具体数字时，不得新增次数、时长、比例或数量，必须使用低频、中频、高频、持续跟进、按项目节点等定性节奏)
 - gap_fix:绩效差距修正方法(把抽象特征拆成可观察行为 + 小目标;需反馈处按 SBI 组织)
 - scripts:话术示例(固定 2 条，严格使用上述 script 1 与 script 2 的 GROW 结构)
 
 【约束】classification_status 不是“已判定”时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"类型尚未已判定，需先补充或人工确认"}；high_risk_personnel_action=true 时，禁止生成方案，返回 {"status":"停止生成","type_id":null,"steps":[],"stop_reason":"高风险人事处置需转人工处理"}。方案必须遵循已校验的用人策略与教练模式，并结合步骤 2 判定说明；必须引用 normalized_profile 中员工的实际目标、可观察行为或具体任务，不得臆造未提供事实，不得使用“XX 模块”等占位词。首次生成和重新生成遵守相同事实边界。strategy、coach_mode、classification_reason 等内部字段名不得直接拼入面向员工的话术。其余建议具体可操作;话术为可直接使用的句子;对人不贬损;若为"换个角度"重出,须与上一版措辞/切入不同但结论同类型一致。
+
+frequency 和未来行动同样受数字事实边界约束；“建议”语气不构成新增数字的依据。若输入没有具体次数或时长，只能给定性节奏，不得自行补充“每周1次”“15分钟”等数字。
 
 【输入】
 classification_status:{{classification_status}};type_id:{{type_id}}
